@@ -76,7 +76,6 @@ export default function App() {
   const current = searches.find((s) => s.id === searchId);
   const perSearchPages: { key: Page; label: string }[] = [
     { key: "overview", label: "Search" },
-    { key: "listings", label: "Listings" },
     { key: "hours", label: "Hours" },
     { key: "engagement", label: "Engagement" }
   ];
@@ -133,6 +132,15 @@ export default function App() {
         >
           Clients
         </button>
+        <button
+          className="tab"
+          role="tab"
+          aria-selected={page === "listings"}
+          type="button"
+          onClick={() => setPage("listings")}
+        >
+          Listings
+        </button>
         {current &&
           perSearchPages.map((p) => (
             <button
@@ -179,7 +187,7 @@ export default function App() {
         ) : (
           <div className="loading">Pick or create a search.</div>
         ))}
-      {page === "listings" && searchId && <Listings searchId={searchId} />}
+      {page === "listings" && <Listings searches={searches} />}
       {page === "hours" && current && <Hours search={current} />}
       {page === "engagement" && searchId && <Engagement searchId={searchId} />}
       {page === "audit" && <Audit />}

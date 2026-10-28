@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import {
   MEMBER_ROLES,
+  visibility,
   type Member,
   type MemberRole,
   type Search
@@ -39,21 +40,28 @@ export function Clients({
       // Sequential per search: new AWS accounts have low Lambda concurrency
       // limits, and a parallel fan-out here gets throttled into 503s.
       // One failing search still must not blank the whole page.
+      const pool = (await api.listings()).items;
       const failed: string[] = [];
       const perSearch: {
         search: Search;
         detail: Awaited<ReturnType<typeof api.searchDetail>>;
-        listings: Awaited<ReturnType<typeof api.listings>>;
+        visibleCount: number;
         ratings: Awaited<ReturnType<typeof api.ratings>>;
         comments: Awaited<ReturnType<typeof api.comments>>;
       }[] = [];
       for (const search of searches) {
         try {
           const detail = await api.searchDetail(search.id);
-          const listings = await api.listings(search.id);
+          const shares = await api.shares(search.id);
+          const shareMap = new Map(shares.items.map((i) => [i.listingId, i.mode]));
+          const visibleCount = pool.filter(
+            (l) =>
+              visibility(l, detail.brief, search.settings, shareMap.get(l.id))
+                .visible
+          ).length;
           const ratings = await api.ratings(search.id);
           const comments = await api.comments(search.id);
-          perSearch.push({ search, detail, listings, ratings, comments });
+          perSearch.push({ search, detail, visibleCount, ratings, comments });
         } catch (reason) {
           failed.push(
             `${search.clientName}: ${
@@ -64,7 +72,7 @@ export function Clients({
       }
       const cutoff = Date.now() - 30 * 86_400_000;
       const built: ClientRow[] = [];
-      for (const { search, detail, listings, ratings, comments } of perSearch) {
+      for (const { search, detail, visibleCount, ratings, comments } of perSearch) {
         for (const member of detail.members) {
           const mine = ratings.items.filter((r) => r.userId === member.userId);
           // Activity is nice-to-have; never let it block the roster.
@@ -83,8 +91,8 @@ export function Clients({
           built.push({
             member,
             search,
-            publishedListings: listings.items.filter((l) => l.published).length,
-            totalListings: listings.items.length,
+            publishedListings: visibleCount,
+            totalListings: pool.length,
             ratingsGiven: mine.length,
             avgScore: mine.length
               ? mine.reduce((a, r) => a + r.score, 0) / mine.length
@@ -298,7 +306,8 @@ export function Clients({
         </div>
       )}
       <p className="note-line">
-        "Listings for them" = published / total in their search. Removing a
+        "Listings for them" = visible to this client (brief matches + manual
+        shares − hides) / total pool. Removing a
         client revokes access immediately; their Cognito account remains and can
         be re-invited. Activity counts the client's tracked interactions in the
         last 30 days.

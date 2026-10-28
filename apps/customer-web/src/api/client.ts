@@ -68,10 +68,12 @@ export const api = {
     ),
   listings: (sid: string) =>
     call<{ items: CustomerListing[] }>(`/searches/${sid}/listings?limit=200`),
-  photos: (sid: string) =>
-    call<{ items: (Photo & { url: string })[] }>(
-      `/searches/${sid}/photos?limit=500`
-    ),
+  photos: (sid: string, listingIds: string[]) =>
+    listingIds.length === 0
+      ? Promise.resolve({ items: [] as (Photo & { url: string })[] })
+      : call<{ items: (Photo & { url: string })[] }>(
+          `/searches/${sid}/photos?ids=${listingIds.slice(0, 120).join(",")}`
+        ),
   ratings: (sid: string) => call<{ items: Rating[] }>(`/searches/${sid}/ratings`),
   putRating: (sid: string, lid: string, body: RatingPutInput) =>
     call<Rating>(`/searches/${sid}/listings/${lid}/rating`, {

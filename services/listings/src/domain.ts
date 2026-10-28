@@ -14,12 +14,11 @@ export { paginateOffset };
 /* Pure domain logic, unit-tested without DynamoDB. */
 
 export function buildListing(
-  searchId: string,
   input: ListingCreateInput,
   id: string,
   now: string
 ): Listing {
-  return { id, searchId, ...input, createdAt: now, updatedAt: now };
+  return { id, ...input, createdAt: now, updatedAt: now };
 }
 
 export function mergeListing(
@@ -33,6 +32,11 @@ export function mergeListing(
 
 export function toCustomerListing(l: Listing): CustomerListing {
   return customerListingSchema.parse(l);
+}
+
+/** Default customer ordering: newest first, benchmark pinned, passed last. */
+export function sortCustomerCards(listings: Listing[]): Listing[] {
+  return sortListings(listings, "new");
 }
 
 export function applyFilters(

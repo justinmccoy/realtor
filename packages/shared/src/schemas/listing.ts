@@ -77,9 +77,11 @@ export type ListingCreateInput = z.infer<typeof listingCreateSchema>;
 export const listingUpdateSchema = z.object(listingFields).partial();
 export type ListingUpdateInput = z.infer<typeof listingUpdateSchema>;
 
+/** Listings live in one global pool (no owning search); per-client visibility
+ *  is resolved via matching + share overrides (see matching.ts). `published`
+ *  is the global Active gate — drafts are invisible everywhere. */
 export const listingSchema = z.object({
   id: z.string().ulid(),
-  searchId: z.string().ulid(),
   ...listingFields,
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime()
@@ -117,9 +119,9 @@ export const sourceCreateSchema = z.object({
   urls: z.array(httpUrl).min(1).max(50)
 });
 
+/** Inbox links live in the global pool alongside listings. */
 export const sourceSchema = z.object({
   id: z.string().ulid(),
-  searchId: z.string().ulid(),
   url: httpUrl,
   status: z.enum(SOURCE_STATUSES),
   listingId: z.string().ulid().nullable(),

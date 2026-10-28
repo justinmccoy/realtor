@@ -79,7 +79,7 @@ export const handler = dispatch({
     fn: async ({ path, body, event }) => {
       const admin = adminAuth(event);
       if (body.listingId) {
-        await repo.requireListingInSearch(body.listingId, path.searchId, {
+        await repo.requireListingActive(body.listingId, {
           mustBePublished: false
         });
       }

@@ -21,6 +21,7 @@ import type {
   Search,
   SearchCreateInput,
   SearchUpdateInput,
+  ShareMode,
   Source,
   Timer
 } from "@jj/shared";
@@ -113,9 +114,8 @@ export const api = {
   removeMember: (sid: string, userId: string) =>
     call<void>(`/admin/searches/${sid}/members/${userId}`, { method: "DELETE" }),
 
-  /* listings */
+  /* listings (global pool) */
   listings: (
-    sid: string,
     params: {
       status?: ListingStatus;
       q?: string;
@@ -124,17 +124,13 @@ export const api = {
     } = {}
   ) =>
     call<{ items: Listing[]; nextCursor: string | null }>(
-      `/admin/searches/${sid}/listings${qs({ limit: 100, ...params })}`
+      `/admin/listings${qs({ limit: 200, ...params })}`
     ),
-  createListing: (sid: string, body: ListingCreateInput) =>
-    call<Listing>(`/admin/searches/${sid}/listings`, { method: "POST", body }),
-  updateListing: (sid: string, lid: string, body: ListingUpdateInput) =>
-    call<Listing>(`/admin/searches/${sid}/listings/${lid}`, {
-      method: "PUT",
-      body
-    }),
+  createListing: (body: ListingCreateInput) =>
+    call<Listing>("/admin/listings", { method: "POST", body }),
+  updateListing: (lid: string, body: ListingUpdateInput) =>
+    call<Listing>(`/admin/listings/${lid}`, { method: "PUT", body }),
   patchListing: (
-    sid: string,
     lid: string,
     what: "status" | "contact" | "rank" | "remodel" | "publish",
     body:
@@ -144,68 +140,60 @@ export const api = {
       | { remodel: Remodel | null }
       | { published: boolean }
   ) =>
-    call<Listing>(`/admin/searches/${sid}/listings/${lid}/${what}`, {
-      method: "PATCH",
-      body
-    }),
-  deleteListing: (sid: string, lid: string) =>
-    call<void>(`/admin/searches/${sid}/listings/${lid}`, { method: "DELETE" }),
-  bulkListings: (
-    sid: string,
-    body: {
-      ids: string[];
-      op: "publish" | "unpublish" | "status" | "delete";
-      status?: ListingStatus;
-    }
-  ) =>
-    call<{ items: Listing[] }>(`/admin/searches/${sid}/listings/bulk`, {
-      method: "POST",
-      body
-    }),
+    call<Listing>(`/admin/listings/${lid}/${what}`, { method: "PATCH", body }),
+  deleteListing: (lid: string) =>
+    call<void>(`/admin/listings/${lid}`, { method: "DELETE" }),
+  bulkListings: (body: {
+    ids: string[];
+    op: "publish" | "unpublish" | "status" | "delete";
+    status?: ListingStatus;
+  }) => call<{ items: Listing[] }>("/admin/listings/bulk", { method: "POST", body }),
   viewings: (days = 14) =>
     call<{ items: Listing[] }>(`/admin/viewings${qs({ days })}`),
 
-  /* inbox */
-  inbox: (sid: string) => call<{ items: Source[] }>(`/admin/searches/${sid}/inbox`),
-  addInbox: (sid: string, urls: string[]) =>
-    call<{ items: Source[] }>(`/admin/searches/${sid}/inbox`, {
-      method: "POST",
-      body: { urls }
-    }),
+  /* per-search sharing */
+  shares: (sid: string) =>
+    call<{ items: { listingId: string; mode: ShareMode }[] }>(
+      `/admin/searches/${sid}/shares`
+    ),
+  putShare: (sid: string, lid: string, mode: ShareMode) =>
+    call<{ listingId: string; mode: ShareMode }>(
+      `/admin/searches/${sid}/shares/${lid}`,
+      { method: "PUT", body: { mode } }
+    ),
+  clearShare: (sid: string, lid: string) =>
+    call<void>(`/admin/searches/${sid}/shares/${lid}`, { method: "DELETE" }),
+
+  /* inbox (global) */
+  inbox: () => call<{ items: Source[] }>("/admin/inbox"),
+  addInbox: (urls: string[]) =>
+    call<{ items: Source[] }>("/admin/inbox", { method: "POST", body: { urls } }),
   patchInbox: (
-    sid: string,
     sourceId: string,
     body: { status?: string; listingId?: string | null }
-  ) =>
-    call<Source>(`/admin/searches/${sid}/inbox/${sourceId}`, {
-      method: "PATCH",
-      body
-    }),
-  deleteInbox: (sid: string, sourceId: string) =>
-    call<void>(`/admin/searches/${sid}/inbox/${sourceId}`, { method: "DELETE" }),
+  ) => call<Source>(`/admin/inbox/${sourceId}`, { method: "PATCH", body }),
+  deleteInbox: (sourceId: string) =>
+    call<void>(`/admin/inbox/${sourceId}`, { method: "DELETE" }),
 
-  /* media */
-  photos: (sid: string) =>
-    call<{ items: PhotoWithUrl[] }>(`/admin/searches/${sid}/photos`),
-  presign: (sid: string, lid: string, kind: PhotoKind, contentType: string) =>
-    call<PresignResponse>(
-      `/admin/searches/${sid}/listings/${lid}/photos/presign`,
-      { method: "POST", body: { kind, contentType } }
-    ),
-  confirmPhoto: (sid: string, lid: string, photoId: string) =>
-    call<PhotoWithUrl>(
-      `/admin/searches/${sid}/listings/${lid}/photos/${photoId}/confirm`,
-      { method: "POST" }
-    ),
-  reorderPhotos: (sid: string, lid: string, kind: PhotoKind, orderedIds: string[]) =>
-    call<{ items: Photo[] }>(
-      `/admin/searches/${sid}/listings/${lid}/photos/order`,
-      { method: "PATCH", body: { kind, orderedIds } }
-    ),
-  deletePhoto: (sid: string, lid: string, photoId: string) =>
-    call<void>(`/admin/searches/${sid}/listings/${lid}/photos/${photoId}`, {
-      method: "DELETE"
+  /* media (per listing) */
+  photos: (lid: string) =>
+    call<{ items: PhotoWithUrl[] }>(`/admin/listings/${lid}/photos`),
+  presign: (lid: string, kind: PhotoKind, contentType: string) =>
+    call<PresignResponse>(`/admin/listings/${lid}/photos/presign`, {
+      method: "POST",
+      body: { kind, contentType }
     }),
+  confirmPhoto: (lid: string, photoId: string) =>
+    call<PhotoWithUrl>(`/admin/listings/${lid}/photos/${photoId}/confirm`, {
+      method: "POST"
+    }),
+  reorderPhotos: (lid: string, kind: PhotoKind, orderedIds: string[]) =>
+    call<{ items: Photo[] }>(`/admin/listings/${lid}/photos/order`, {
+      method: "PATCH",
+      body: { kind, orderedIds }
+    }),
+  deletePhoto: (lid: string, photoId: string) =>
+    call<void>(`/admin/listings/${lid}/photos/${photoId}`, { method: "DELETE" }),
 
   /* engagement */
   ratings: (sid: string) => call<{ items: Rating[] }>(`/admin/searches/${sid}/ratings`),

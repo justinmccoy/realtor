@@ -4,18 +4,38 @@ import {
   LISTING_STATUSES,
   districtNumber,
   pricePerSqm,
+  visibility,
+  type Brief,
   type Listing,
   type ListingStatus,
-  type PhotoKind
+  type PhotoKind,
+  type Search,
+  type ShareMode,
+  type Source,
+  type VisibilityReason
 } from "@jj/shared";
 import { api, type PhotoWithUrl } from "../api/client";
 import { eur, fmtWhen } from "../lib/format";
 import { DangerButton, Modal, useToast } from "../components/ui";
 import { ListingEditor, type EditorTarget } from "./ListingEditor";
 
-export function Listings({ searchId }: { searchId: string }) {
+interface SearchCtx {
+  search: Search;
+  brief: Brief;
+  shares: Map<string, ShareMode>;
+}
+
+const REASON_LABEL: Record<VisibilityReason, string> = {
+  match: "auto ✓",
+  shared: "shared",
+  hidden: "hidden",
+  "no-match": "—",
+  draft: "draft"
+};
+
+export function Listings({ searches }: { searches: Search[] }) {
   const [listings, setListings] = useState<Listing[]>([]);
-  const [photos, setPhotos] = useState<PhotoWithUrl[]>([]);
+  const [contexts, setContexts] = useState<SearchCtx[]>([]);
   const [status, setStatus] = useState<"" | ListingStatus>("");
   const [published, setPublished] = useState<"" | "true" | "false">("");
   const [q, setQ] = useState("");
@@ -23,22 +43,38 @@ export function Listings({ searchId }: { searchId: string }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [editor, setEditor] = useState<EditorTarget | null>(null);
   const [photoTarget, setPhotoTarget] = useState<Listing | null>(null);
+  const [shareTarget, setShareTarget] = useState<Listing | null>(null);
   const [toastEl, toast] = useToast();
 
+  const active = searches.filter((s) => s.status === "active");
+
   const reload = useCallback(async () => {
-    const [ls, ph] = await Promise.all([
-      api.listings(searchId, {
-        status: status || undefined,
-        q: q || undefined,
-        published: published === "" ? undefined : published === "true",
-        sort
-      }),
-      api.photos(searchId)
-    ]);
+    const ls = await api.listings({
+      status: status || undefined,
+      q: q || undefined,
+      published: published === "" ? undefined : published === "true",
+      sort
+    });
     setListings(ls.items);
-    setPhotos(ph.items);
     setSelected(new Set());
-  }, [searchId, status, q, published, sort]);
+    // Per-search context (brief + overrides) for visibility badges — loaded
+    // sequentially to stay friendly to low Lambda concurrency limits.
+    const ctxs: SearchCtx[] = [];
+    for (const search of active) {
+      try {
+        const detail = await api.searchDetail(search.id);
+        const shares = await api.shares(search.id);
+        ctxs.push({
+          search,
+          brief: detail.brief,
+          shares: new Map(shares.items.map((i) => [i.listingId, i.mode]))
+        });
+      } catch {
+        /* badge column shows nothing for this search */
+      }
+    }
+    setContexts(ctxs);
+  }, [status, q, published, sort, active.map((s) => s.id).join(",")]);
 
   useEffect(() => {
     void reload();
@@ -51,19 +87,21 @@ export function Listings({ searchId }: { searchId: string }) {
 
   async function bulk(op: "publish" | "unpublish" | "delete" | "status", s?: ListingStatus) {
     if (!selected.size) return;
-    await api.bulkListings(searchId, {
-      ids: [...selected],
-      op,
-      ...(s ? { status: s } : {})
-    });
+    await api.bulkListings({ ids: [...selected], op, ...(s ? { status: s } : {}) });
     toast(`Bulk ${op} done (${selected.size})`);
     await reload();
   }
 
+  const visibleBadges = (l: Listing) =>
+    contexts.map((ctx) => {
+      const v = visibility(l, ctx.brief, ctx.search.settings, ctx.shares.get(l.id));
+      return { name: ctx.search.clientName, ...v };
+    });
+
   return (
     <section style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       <div className="page-h">
-        <h2>Listings</h2>
+        <h2>Listings · global pool</h2>
         <button className="btn primary" type="button" onClick={() => setEditor({ listing: null })}>
           + Add listing
         </button>
@@ -85,8 +123,8 @@ export function Listings({ searchId }: { searchId: string }) {
           ))}
         </select>
         <select className="inline" value={published} onChange={(e) => setPublished(e.target.value as "" | "true" | "false")}>
-          <option value="">Published + drafts</option>
-          <option value="true">Published only</option>
+          <option value="">Active + drafts</option>
+          <option value="true">Active only</option>
           <option value="false">Drafts only</option>
         </select>
         <select className="inline" value={sort} onChange={(e) => setSort(e.target.value as typeof sort)}>
@@ -100,10 +138,10 @@ export function Listings({ searchId }: { searchId: string }) {
         <div className="bulkbar">
           <b>{selected.size} selected</b>
           <button className="btn" type="button" onClick={() => void bulk("publish")}>
-            Publish
+            Activate
           </button>
           <button className="btn" type="button" onClick={() => void bulk("unpublish")}>
-            Unpublish
+            Deactivate
           </button>
           <select
             className="inline"
@@ -138,8 +176,8 @@ export function Listings({ searchId }: { searchId: string }) {
               <th>Listing</th>
               <th>Status</th>
               <th>Price</th>
-              <th>€/m²</th>
-              <th>Published</th>
+              <th>Active</th>
+              <th>Visible to</th>
               <th>Viewing</th>
               <th></th>
             </tr>
@@ -147,7 +185,6 @@ export function Listings({ searchId }: { searchId: string }) {
           <tbody>
             {listings.map((l) => {
               const psqm = pricePerSqm(l.price, l.sqm);
-              const nPhotos = photos.filter((p) => p.listingId === l.id).length;
               return (
                 <tr key={l.id}>
                   <td className="sel">
@@ -171,7 +208,7 @@ export function Listings({ searchId }: { searchId: string }) {
                     <br />
                     <small className="muted">
                       {districtNumber(l.bezirk)} · {l.ortsteil ?? l.bezirk}
-                      {l.kiez ? ` · ${l.kiez}` : ""} · {nPhotos} photo{nPhotos === 1 ? "" : "s"}
+                      {l.kiez ? ` · ${l.kiez}` : ""}
                     </small>
                   </td>
                   <td>
@@ -181,7 +218,7 @@ export function Listings({ searchId }: { searchId: string }) {
                       value={l.status}
                       onChange={(e) =>
                         void api
-                          .patchListing(searchId, l.id, "status", {
+                          .patchListing(l.id, "status", {
                             status: e.target.value as ListingStatus
                           })
                           .then(reload)
@@ -194,8 +231,15 @@ export function Listings({ searchId }: { searchId: string }) {
                       ))}
                     </select>
                   </td>
-                  <td className="num">{l.price ? eur(l.price) : "—"}</td>
-                  <td className="num">{psqm ? eur(psqm) : "—"}</td>
+                  <td className="num">
+                    {l.price ? eur(l.price) : "—"}
+                    {psqm && (
+                      <>
+                        <br />
+                        <small className="muted">{eur(psqm)}/m²</small>
+                      </>
+                    )}
+                  </td>
                   <td>
                     <label className="paidbox">
                       <input
@@ -203,17 +247,29 @@ export function Listings({ searchId }: { searchId: string }) {
                         checked={l.published}
                         onChange={(e) =>
                           void api
-                            .patchListing(searchId, l.id, "publish", {
+                            .patchListing(l.id, "publish", {
                               published: e.target.checked
                             })
                             .then(() => {
-                              toast(e.target.checked ? "Published" : "Unpublished");
+                              toast(e.target.checked ? "Activated" : "Now a draft");
                               return reload();
                             })
                         }
                       />{" "}
-                      {l.published ? "Live" : "Draft"}
+                      {l.published ? "Active" : "Draft"}
                     </label>
+                  </td>
+                  <td>
+                    <button
+                      className="btn ghost"
+                      type="button"
+                      onClick={() => setShareTarget(l)}
+                      title="Manage per-client visibility"
+                    >
+                      {visibleBadges(l)
+                        .map((b) => `${b.name}: ${REASON_LABEL[b.reason]}`)
+                        .join(" · ") || "—"}
+                    </button>
                   </td>
                   <td className="muted">{l.viewingAt ? fmtWhen(l.viewingAt) : "—"}</td>
                   <td>
@@ -226,7 +282,7 @@ export function Listings({ searchId }: { searchId: string }) {
                       </button>
                       <DangerButton
                         onConfirm={() =>
-                          void api.deleteListing(searchId, l.id).then(() => {
+                          void api.deleteListing(l.id).then(() => {
                             toast("Listing deleted");
                             return reload();
                           })
@@ -247,12 +303,16 @@ export function Listings({ searchId }: { searchId: string }) {
           </tbody>
         </table>
       </div>
+      <p className="note-line">
+        Visible to: <b>auto ✓</b> matches the client's brief · <b>shared</b> /{" "}
+        <b>hidden</b> are manual overrides · <b>—</b> no match · <b>draft</b>{" "}
+        never shown. Click to change.
+      </p>
 
-      <Inbox searchId={searchId} onConvert={(t) => setEditor(t)} toast={toast} />
+      <Inbox onConvert={(t) => setEditor(t)} toast={toast} />
 
       {editor && (
         <ListingEditor
-          searchId={searchId}
           target={editor}
           onClose={() => setEditor(null)}
           onSaved={() => void reload()}
@@ -261,10 +321,16 @@ export function Listings({ searchId }: { searchId: string }) {
       )}
       {photoTarget && (
         <PhotoManager
-          searchId={searchId}
           listing={photoTarget}
-          photos={photos.filter((p) => p.listingId === photoTarget.id)}
           onClose={() => setPhotoTarget(null)}
+          toast={toast}
+        />
+      )}
+      {shareTarget && (
+        <ShareManager
+          listing={shareTarget}
+          contexts={contexts}
+          onClose={() => setShareTarget(null)}
           onChanged={() => void reload()}
           toast={toast}
         />
@@ -274,22 +340,93 @@ export function Listings({ searchId }: { searchId: string }) {
   );
 }
 
+/** Per-client visibility for one listing: Auto / Share / Hide per search. */
+function ShareManager({
+  listing,
+  contexts,
+  onClose,
+  onChanged,
+  toast
+}: {
+  listing: Listing;
+  contexts: SearchCtx[];
+  onClose: () => void;
+  onChanged: () => void;
+  toast: (m: string) => void;
+}) {
+  async function set(sid: string, value: "auto" | ShareMode) {
+    if (value === "auto") await api.clearShare(sid, listing.id);
+    else await api.putShare(sid, listing.id, value);
+    toast("Visibility updated");
+    onChanged();
+  }
+  return (
+    <Modal title={`Visibility — ${listing.title}`} onClose={onClose}>
+      {!listing.published && (
+        <p className="err" style={{ margin: 0 }}>
+          This listing is a draft — no client can see it until it's Active.
+        </p>
+      )}
+      {contexts.length === 0 && (
+        <p className="note-line">No active client searches yet.</p>
+      )}
+      {contexts.map((ctx) => {
+        const share = ctx.shares.get(listing.id);
+        const v = visibility(listing, ctx.brief, ctx.search.settings, share);
+        const matches = visibility(
+          { ...listing, published: true },
+          ctx.brief,
+          ctx.search.settings,
+          undefined
+        ).visible;
+        return (
+          <div className="vbox" key={ctx.search.id}>
+            <div className="vbox-h">
+              <h4>{ctx.search.clientName}</h4>
+              <span className={`rmini2${v.visible ? " ok" : ""}`}>
+                {v.visible ? "visible" : "not visible"} · {REASON_LABEL[v.reason]}
+              </span>
+            </div>
+            <p className="note-line" style={{ margin: 0 }}>
+              {matches
+                ? "Matches this client's brief."
+                : "Does not match this client's brief."}
+            </p>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {(["auto", "shared", "hidden"] as const).map((opt) => (
+                <button
+                  key={opt}
+                  type="button"
+                  className="chip"
+                  aria-pressed={(share ?? "auto") === opt}
+                  onClick={() => void set(ctx.search.id, opt)}
+                >
+                  {opt === "auto"
+                    ? "Auto (follow brief)"
+                    : opt === "shared"
+                      ? "Share"
+                      : "Hide"}
+                </button>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </Modal>
+  );
+}
+
 function Inbox({
-  searchId,
   onConvert,
   toast
 }: {
-  searchId: string;
   onConvert: (t: EditorTarget) => void;
   toast: (m: string) => void;
 }) {
-  const [sources, setSources] = useState<{ id: string; url: string; status: string; listingId: string | null }[]>([]);
+  const [sources, setSources] = useState<Source[]>([]);
   const [urls, setUrls] = useState("");
 
-  const reload = useCallback(
-    () => api.inbox(searchId).then((r) => setSources(r.items)),
-    [searchId]
-  );
+  const reload = useCallback(() => api.inbox().then((r) => setSources(r.items)), []);
   useEffect(() => {
     void reload();
   }, [reload]);
@@ -310,7 +447,7 @@ function Inbox({
             toast("Paste at least one http(s) link");
             return;
           }
-          void api.addInbox(searchId, list).then((r) => {
+          void api.addInbox(list).then((r) => {
             setUrls("");
             toast(`${r.items.length} link(s) added`);
             return reload();
@@ -346,16 +483,12 @@ function Inbox({
                 <button
                   className="btn ghost"
                   type="button"
-                  onClick={() =>
-                    onConvert({ listing: null, sourceId: s.id, sourceUrl: s.url })
-                  }
+                  onClick={() => onConvert({ listing: null, sourceId: s.id, sourceUrl: s.url })}
                 >
                   Convert
                 </button>
                 <DangerButton
-                  onConfirm={() =>
-                    void api.deleteInbox(searchId, s.id).then(() => reload())
-                  }
+                  onConfirm={() => void api.deleteInbox(s.id).then(() => reload())}
                 />
               </span>
             </li>
@@ -367,22 +500,25 @@ function Inbox({
 }
 
 function PhotoManager({
-  searchId,
   listing,
-  photos,
   onClose,
-  onChanged,
   toast
 }: {
-  searchId: string;
   listing: Listing;
-  photos: PhotoWithUrl[];
   onClose: () => void;
-  onChanged: () => void;
   toast: (m: string) => void;
 }) {
+  const [photos, setPhotos] = useState<PhotoWithUrl[]>([]);
   const [busy, setBusy] = useState(false);
   const [kind, setKind] = useState<PhotoKind>("photo");
+
+  const reload = useCallback(
+    () => api.photos(listing.id).then((r) => setPhotos(r.items)),
+    [listing.id]
+  );
+  useEffect(() => {
+    void reload();
+  }, [reload]);
 
   async function upload(files: FileList | null) {
     if (!files?.length) return;
@@ -391,18 +527,18 @@ function PhotoManager({
     try {
       for (const file of [...files]) {
         if (!/^image\/(jpeg|png|webp)$/.test(file.type)) continue;
-        const presigned = await api.presign(searchId, listing.id, kind, file.type);
+        const presigned = await api.presign(listing.id, kind, file.type);
         const put = await fetch(presigned.uploadUrl, {
           method: "PUT",
           headers: presigned.headers,
           body: file
         });
         if (!put.ok) throw new Error(`Upload failed (${put.status})`);
-        await api.confirmPhoto(searchId, listing.id, presigned.photoId);
+        await api.confirmPhoto(listing.id, presigned.photoId);
         ok++;
       }
       toast(`Added ${ok} ${kind === "floorplan" ? "floor plan" : "photo"}${ok === 1 ? "" : "s"}`);
-      onChanged();
+      await reload();
     } catch (e) {
       toast(e instanceof Error ? e.message : "Upload failed");
     } finally {
@@ -416,8 +552,8 @@ function PhotoManager({
     const j = i + dir;
     if (i < 0 || j < 0 || j >= list.length) return;
     [list[i], list[j]] = [list[j]!, list[i]!];
-    await api.reorderPhotos(searchId, listing.id, ofKind, list);
-    onChanged();
+    await api.reorderPhotos(listing.id, ofKind, list);
+    await reload();
   }
 
   const grid = (ofKind: PhotoKind) => {
@@ -442,9 +578,9 @@ function PhotoManager({
               </button>
               <DangerButton
                 onConfirm={() =>
-                  void api.deletePhoto(searchId, listing.id, p.id).then(() => {
+                  void api.deletePhoto(listing.id, p.id).then(() => {
                     toast("Photo deleted");
-                    onChanged();
+                    return reload();
                   })
                 }
               />

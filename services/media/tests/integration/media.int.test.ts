@@ -18,7 +18,6 @@ import { photoS3Key } from "../../src/keys.js";
 
 const run = process.env.RUN_INTEGRATION === "1";
 const TABLE = "jj-media-int-test";
-const SID = "01JD4WPKXK8Z1Q2W3E4R5T6Y7V";
 
 process.env.MEDIA_TABLE = TABLE;
 process.env.AWS_REGION = "eu-central-1";
@@ -43,9 +42,8 @@ function photo(listingId: string, over: Partial<Photo> = {}): Photo {
   return {
     id,
     listingId,
-    searchId: SID,
     kind: "photo",
-    s3Key: photoS3Key(SID, listingId, id, "image/jpeg"),
+    s3Key: photoS3Key(listingId, id, "image/jpeg"),
     contentType: "image/jpeg",
     sortOrder: 0,
     status: "pending",
@@ -116,27 +114,24 @@ describe.skipIf(!run)("media repo against DynamoDB (local emulator)", () => {
     expect(all.map((p) => p.id)).toEqual([p1.id, p2.id]);
   });
 
-  it("search-wide GSI query and published filtering map", async () => {
+  it("active-flag map defaults false and follows events", async () => {
     const repo = await import("../../src/repo.js");
     const lidA = newId();
     const lidB = newId();
     await repo.putPhoto(photo(lidA, { status: "ready" }));
     await repo.putPhoto(photo(lidB, { status: "ready" }));
 
-    const bySearch = await repo.listBySearch(SID);
-    expect(bySearch.length).toBeGreaterThanOrEqual(2);
-
-    // No META yet: everything defaults to unpublished.
+    // No META yet: everything defaults to inactive.
     let map = await repo.publishedMap([lidA, lidB]);
     expect(map[lidA]).toBe(false);
     expect(map[lidB]).toBe(false);
 
-    await repo.setPublished(lidA, SID, true);
+    await repo.setPublished(lidA, true);
     map = await repo.publishedMap([lidA, lidB]);
     expect(map[lidA]).toBe(true);
     expect(map[lidB]).toBe(false);
 
-    await repo.setPublished(lidA, SID, false);
+    await repo.setPublished(lidA, false);
     map = await repo.publishedMap([lidA]);
     expect(map[lidA]).toBe(false);
   });
@@ -167,7 +162,7 @@ describe.skipIf(!run)("media repo against DynamoDB (local emulator)", () => {
     const p2 = photo(lid, { kind: "floorplan", status: "ready" });
     await repo.putPhoto(p1);
     await repo.putPhoto(p2);
-    await repo.setPublished(lid, SID, true);
+    await repo.setPublished(lid, true);
 
     const keys = await repo.deleteAllForListing(lid);
     expect(new Set(keys)).toEqual(new Set([p1.s3Key, p2.s3Key]));

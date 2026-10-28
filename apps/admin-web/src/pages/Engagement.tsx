@@ -25,7 +25,7 @@ export function Engagement({ searchId }: { searchId: string }) {
       api.comments(searchId),
       api.engagement(searchId),
       api.activity({ searchId, limit: 50 }),
-      api.listings(searchId)
+      api.listings()
     ]);
     setRatings(r.items);
     setComments(c.items);

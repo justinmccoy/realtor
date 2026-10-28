@@ -48,25 +48,21 @@ export async function getListingMeta(
   );
   return res.Item
     ? {
-        searchId: String(res.Item.searchId),
         title: String(res.Item.title ?? ""),
         published: Boolean(res.Item.published)
       }
     : null;
 }
 
-/** Guards customer writes: the listing must belong to the search, and (for
- *  customers) be published. Meta arrives via events, so a listing created
- *  moments ago may not be visible yet — surfaced as not_found, retryable. */
-export async function requireListingInSearch(
+/** Guards customer writes: the listing must exist and (for customers) be
+ *  active. Meta arrives via events, so a listing created moments ago may not
+ *  be known yet — surfaced as not_found, retryable. */
+export async function requireListingActive(
   listingId: string,
-  searchId: string,
   opts: { mustBePublished: boolean }
 ): Promise<ListingMeta> {
   const meta = await getListingMeta(listingId);
-  if (!meta || meta.searchId !== searchId) {
-    throw ApiError.notFound("Listing");
-  }
+  if (!meta) throw ApiError.notFound("Listing");
   if (opts.mustBePublished && !meta.published) {
     throw ApiError.forbidden("Listing is not available");
   }

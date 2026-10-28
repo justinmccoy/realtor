@@ -33,7 +33,6 @@ export const photoConfirmSchema = z.object({
 export const photoSchema = z.object({
   id: z.string().ulid(),
   listingId: z.string().ulid(),
-  searchId: z.string().ulid(),
   kind: z.enum(PHOTO_KINDS),
   s3Key: z.string(),
   contentType: z.string(),

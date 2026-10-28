@@ -9,7 +9,6 @@ import {
   toCustomerListing
 } from "../../src/domain.js";
 
-const SID = "01JD4WPKXK8Z1Q2W3E4R5T6Y7V";
 const now = "2026-10-28T12:00:00.000Z";
 
 let seq = 0;
@@ -20,7 +19,7 @@ function make(partial: Partial<Listing> & { title: string }): Listing {
     title: partial.title,
     bezirk: partial.bezirk ?? "Mitte"
   });
-  return { ...base, ...partial, id, searchId: SID, createdAt: now, updatedAt: now };
+  return { ...base, ...partial, id, createdAt: now, updatedAt: now };
 }
 
 describe("sortListings", () => {
@@ -98,11 +97,10 @@ describe("customer projection", () => {
 describe("build/merge", () => {
   it("merge keeps identity fields and bumps updatedAt", () => {
     const input = listingCreateSchema.parse({ title: "T", bezirk: "Mitte" });
-    const l = buildListing(SID, input, "01JD4WPKXK8Z1Q2W3E4R5T6Y99".slice(0, 26), now);
+    const l = buildListing(input, "01JD4WPKXK8Z1Q2W3E4R5T6Y99".slice(0, 26), now);
     const later = "2026-10-29T12:00:00.000Z";
     const m = mergeListing(l, { price: 500000, status: "short" }, later);
     expect(m.id).toBe(l.id);
-    expect(m.searchId).toBe(SID);
     expect(m.price).toBe(500000);
     expect(m.status).toBe("short");
     expect(m.createdAt).toBe(now);

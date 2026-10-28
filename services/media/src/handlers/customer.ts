@@ -5,17 +5,23 @@ import {
   dispatch,
   requireSearchAccess
 } from "@jj/lambda-kit";
-import { pageQuerySchema, paginateOffset } from "@jj/shared";
+import type { Photo } from "@jj/shared";
 import * as repo from "../repo.js";
 import * as s3 from "../s3.js";
 
 const searchPath = z.object({ searchId: z.string().ulid() });
-const listQuery = pageQuerySchema.extend({
-  limit: z.coerce.number().int().min(1).max(500).default(500)
+const listQuery = z.object({
+  /** Comma-separated listing ids — the visible set the client already holds
+   *  from the listings endpoint. ULIDs are unguessable; active-flag filtering
+   *  below is the hard gate. */
+  ids: z
+    .string()
+    .min(1)
+    .max(4000)
+    .transform((v) => v.split(",").filter(Boolean))
+    .pipe(z.array(z.string().ulid()).min(1).max(120))
 });
 
-/** Gallery data for the customer app: ready photos of published listings
- *  only, with time-limited download URLs. Joined to listings client-side. */
 export const handler = dispatch({
   "GET /api/v1/searches/{searchId}/photos": apiHandler({
     path: searchPath,
@@ -23,19 +29,18 @@ export const handler = dispatch({
     fn: async ({ path, query, event }) => {
       const auth = customerAuth(event);
       requireSearchAccess(auth, path.searchId);
-      const ready = (await repo.listBySearch(path.searchId)).filter(
-        (p) => p.status === "ready"
-      );
-      const visible = await repo.publishedMap(ready.map((p) => p.listingId));
-      const photos = ready.filter((p) => visible[p.listingId]);
-      const page = paginateOffset(photos, query.limit, query.cursor);
+      const active = await repo.publishedMap(query.ids);
+      const photos: Photo[] = [];
+      for (const id of query.ids) {
+        if (!active[id]) continue;
+        photos.push(
+          ...(await repo.listByListing(id)).filter((p) => p.status === "ready")
+        );
+      }
       const items = await Promise.all(
-        page.items.map(async (p) => ({
-          ...p,
-          url: await s3.presignDownload(p.s3Key)
-        }))
+        photos.map(async (p) => ({ ...p, url: await s3.presignDownload(p.s3Key) }))
       );
-      return { body: { items, nextCursor: page.nextCursor } };
+      return { body: { items, nextCursor: null } };
     }
   })
 });

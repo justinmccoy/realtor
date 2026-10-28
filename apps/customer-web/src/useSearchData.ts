@@ -30,15 +30,18 @@ export function useSearchData(searchId: string | null) {
   const load = useCallback(async () => {
     if (!searchId) return;
     try {
-      const [detail, listings, photos, ratings, comments, hours] =
-        await Promise.all([
-          api.searchDetail(searchId),
-          api.listings(searchId),
-          api.photos(searchId),
-          api.ratings(searchId),
-          api.comments(searchId),
-          api.hours(searchId)
-        ]);
+      const [detail, listings, ratings, comments, hours] = await Promise.all([
+        api.searchDetail(searchId),
+        api.listings(searchId),
+        api.ratings(searchId),
+        api.comments(searchId),
+        api.hours(searchId)
+      ]);
+      // Photos are requested for the visible listings (global pool model).
+      const photos = await api.photos(
+        searchId,
+        listings.items.map((l) => l.id)
+      );
       setData({
         clientName: detail.search.clientName,
         settings: detail.search.settings,

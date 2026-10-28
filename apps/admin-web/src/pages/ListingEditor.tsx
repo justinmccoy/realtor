@@ -27,13 +27,11 @@ export interface EditorTarget {
 }
 
 export function ListingEditor({
-  searchId,
   target,
   onClose,
   onSaved,
   toast
 }: {
-  searchId: string;
   target: EditorTarget;
   onClose: () => void;
   onSaved: () => void;
@@ -133,10 +131,10 @@ export function ListingEditor({
     setBusy(true);
     try {
       const saved = l
-        ? await api.updateListing(searchId, l.id, body)
-        : await api.createListing(searchId, body);
+        ? await api.updateListing(l.id, body)
+        : await api.createListing(body);
       if (target.sourceId) {
-        await api.patchInbox(searchId, target.sourceId, {
+        await api.patchInbox(target.sourceId, {
           status: "done",
           listingId: saved.id
         });
@@ -192,7 +190,7 @@ export function ListingEditor({
             checked={f.published}
             onChange={(e) => set("published", e.target.checked)}
           />{" "}
-          Published — visible to the client
+          Active — eligible for clients (visibility follows matching &amp; sharing)
         </label>
         {text("Source link", "url", {
           placeholder: "https://www.immobilienscout24.de/expose/…"

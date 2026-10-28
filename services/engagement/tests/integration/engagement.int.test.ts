@@ -14,7 +14,6 @@ import { ApiError, type Comment, type Rating } from "@jj/shared";
 const run = process.env.RUN_INTEGRATION === "1";
 const TABLE = "jj-engagement-int-test";
 const SID = "01JD4WPKXK8Z1Q2W3E4R5T6Y7V";
-const OTHER_SID = "01JD4WPKXK8Z1Q2W3E4R5T6Y99";
 
 process.env.ENGAGEMENT_TABLE = TABLE;
 process.env.AWS_REGION = "eu-central-1";
@@ -89,36 +88,31 @@ describe.skipIf(!run)("engagement repo against DynamoDB (local emulator)", () =>
     );
   }, 30_000);
 
-  it("listing meta guards cross-tenant and unpublished writes", async () => {
+  it("listing meta guards unknown and draft listings", async () => {
     const repo = await import("../../src/repo.js");
     const lid = newId();
 
     // Meta not yet arrived via events → not found.
     await expect(
-      repo.requireListingInSearch(lid, SID, { mustBePublished: true })
+      repo.requireListingActive(lid, { mustBePublished: true })
     ).rejects.toThrow(ApiError);
 
     await repo.setListingMeta(lid, {
-      searchId: SID,
       title: "Bright Altbau",
       published: false
     });
-    // Belongs to a different search → not found (no existence leak).
+    // Drafts block customers but not admins.
     await expect(
-      repo.requireListingInSearch(lid, OTHER_SID, { mustBePublished: false })
-    ).rejects.toThrow(/not found/i);
-    // Unpublished blocks customers but not admins.
-    await expect(
-      repo.requireListingInSearch(lid, SID, { mustBePublished: true })
+      repo.requireListingActive(lid, { mustBePublished: true })
     ).rejects.toThrow(/not available/);
-    const meta = await repo.requireListingInSearch(lid, SID, {
+    const meta = await repo.requireListingActive(lid, {
       mustBePublished: false
     });
     expect(meta.title).toBe("Bright Altbau");
 
     await repo.setListingMeta(lid, { ...meta, published: true });
     await expect(
-      repo.requireListingInSearch(lid, SID, { mustBePublished: true })
+      repo.requireListingActive(lid, { mustBePublished: true })
     ).resolves.toBeDefined();
   });
 

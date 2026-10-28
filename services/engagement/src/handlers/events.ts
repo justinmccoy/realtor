@@ -13,8 +13,8 @@ export const handler: EventBridgeHandler<string, DomainEvent, void> = async (
   event
 ) => {
   const d = event.detail;
-  if (!d.listingId || !d.searchId) {
-    logger.warn("listing event missing ids", { type: event["detail-type"] });
+  if (!d.listingId) {
+    logger.warn("listing event missing listingId", { type: event["detail-type"] });
     return;
   }
   const payload = (d.payload ?? {}) as { title?: string; published?: boolean };
@@ -26,7 +26,6 @@ export const handler: EventBridgeHandler<string, DomainEvent, void> = async (
     case "listing.unpublished": {
       const existing = await repo.getListingMeta(d.listingId);
       await repo.setListingMeta(d.listingId, {
-        searchId: d.searchId,
         title: payload.title ?? existing?.title ?? "",
         published:
           event["detail-type"] === "listing.published"

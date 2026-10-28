@@ -26,6 +26,8 @@ export type DomainEventType =
   | "listing.published"
   | "listing.unpublished"
   | "listing.deleted"
+  | "listing.shared"
+  | "listing.unshared"
   | "photo.added"
   | "photo.deleted"
   | "rating.saved"

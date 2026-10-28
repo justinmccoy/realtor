@@ -28,8 +28,8 @@ export const engagementKeys = {
 
 export const SEARCH_RATINGS_INDEX = "GSI1";
 
+/** Listings are global; the event-carried copy keeps title + active flag. */
 export interface ListingMeta {
-  searchId: string;
   title: string;
   published: boolean;
 }

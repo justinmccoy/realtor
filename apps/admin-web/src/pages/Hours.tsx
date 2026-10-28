@@ -24,7 +24,7 @@ export function Hours({ search }: { search: Search }) {
   const reload = useCallback(async () => {
     const [h, l, t] = await Promise.all([
       api.hours(searchId),
-      api.listings(searchId),
+      api.listings(),
       api.timer(searchId)
     ]);
     setEntries(h.items);

@@ -46,7 +46,9 @@ export const handler = dispatch({
         actorName: admin.displayName,
         actorRole: "admin",
         at: nowIso(),
-        summary: `Search created for ${search.clientName}`
+        summary: `Search created for ${search.clientName}`,
+        // Event-carried criteria for the listing service's matching copy.
+        payload: { settings: search.settings, status: search.status }
       });
       return { status: 201, body: search };
     }
@@ -90,17 +92,22 @@ export const handler = dispatch({
         before,
         after: search
       });
-      if (before.status !== "archived" && search.status === "archived") {
-        await publishEvents(EVENT_SOURCES.search, {
-          type: "search.archived",
-          searchId: search.id,
-          actorId: admin.userId,
-          actorName: admin.displayName,
-          actorRole: "admin",
-          at: nowIso(),
-          summary: `Search for ${search.clientName} archived`
-        });
-      }
+      await publishEvents(EVENT_SOURCES.search, {
+        type:
+          before.status !== "archived" && search.status === "archived"
+            ? "search.archived"
+            : "search.updated",
+        searchId: search.id,
+        actorId: admin.userId,
+        actorName: admin.displayName,
+        actorRole: "admin",
+        at: nowIso(),
+        summary:
+          search.status === "archived" && before.status !== "archived"
+            ? `Search for ${search.clientName} archived`
+            : `Search for ${search.clientName} updated`,
+        payload: { settings: search.settings, status: search.status }
+      });
       return { body: search };
     }
   }),
@@ -134,10 +141,12 @@ export const handler = dispatch({
       const search = await repo.requireSearch(path.searchId);
       await repo.putBrief(path.searchId, body);
       // The artifact keeps the brief budget and the settings budget in sync.
+      let settings = search.settings;
       if (body.budget !== search.settings.budget) {
-        await repo.updateSearch(path.searchId, {
+        const updated = await repo.updateSearch(path.searchId, {
           settings: { budget: body.budget }
         });
+        settings = updated.settings;
       }
       await publishAdminAction(EVENT_SOURCES.search, admin, {
         action: "update",
@@ -146,6 +155,16 @@ export const handler = dispatch({
         searchId: path.searchId,
         summary: `Updated search requirements for ${search.clientName}`,
         after: body
+      });
+      await publishEvents(EVENT_SOURCES.search, {
+        type: "search.updated",
+        searchId: path.searchId,
+        actorId: admin.userId,
+        actorName: admin.displayName,
+        actorRole: "admin",
+        at: nowIso(),
+        summary: `Search requirements updated for ${search.clientName}`,
+        payload: { brief: body, settings, status: search.status }
       });
       return { body };
     }

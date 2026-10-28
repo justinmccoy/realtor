@@ -331,10 +331,15 @@ async function main(): Promise<void> {
   for (const { index, body } of parsed) {
     try {
       const created = await api<{ id: string; title: string }>(
-        `/admin/searches/${search.id}/listings`,
+        "/admin/listings",
         "POST",
         body
       );
+      // Pin visibility: imported listings are explicitly shared with the
+      // created search (matching also applies, but a share never surprises).
+      await api(`/admin/searches/${search.id}/shares/${created.id}`, "PUT", {
+        mode: "shared"
+      });
       listingIds[index] = created.id;
       console.log(`  · ${created.title}`);
     } catch (err) {
@@ -350,7 +355,7 @@ async function main(): Promise<void> {
 
   if (seed.sources?.length) {
     console.log(`Adding ${seed.sources.length} inbox links…`);
-    await api(`/admin/searches/${search.id}/inbox`, "POST", {
+    await api("/admin/inbox", "POST", {
       urls: seed.sources.map((s) => s.url)
     });
   }
@@ -416,7 +421,7 @@ async function main(): Promise<void> {
           photoId: string;
           uploadUrl: string;
           headers: Record<string, string>;
-        }>(`/admin/searches/${search.id}/listings/${listingId}/photos/presign`, "POST", {
+        }>(`/admin/listings/${listingId}/photos/presign`, "POST", {
           kind: p.kind ?? "photo",
           contentType: decoded.contentType
         });
@@ -427,7 +432,7 @@ async function main(): Promise<void> {
         });
         if (!put.ok) throw new Error(`S3 PUT failed (${put.status})`);
         await api(
-          `/admin/searches/${search.id}/listings/${listingId}/photos/${presigned.photoId}/confirm`,
+          `/admin/listings/${listingId}/photos/${presigned.photoId}/confirm`,
           "POST"
         );
         ok++;

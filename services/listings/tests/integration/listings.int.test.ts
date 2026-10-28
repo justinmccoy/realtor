@@ -11,7 +11,7 @@ import {
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import dynalite from "dynalite";
 import type { Server } from "http";
-import { listingCreateSchema } from "@jj/shared";
+import { briefSchema, listingCreateSchema, settingsSchema } from "@jj/shared";
 
 const run = process.env.RUN_INTEGRATION === "1";
 const TABLE = "jj-listing-int-test";
@@ -81,10 +81,9 @@ describe.skipIf(!run)("listing repo against DynamoDB (local emulator)", () => {
     );
   }, 30_000);
 
-  it("CRUD round-trip with full artifact field set", async () => {
+  it("CRUD round-trip in the global pool", async () => {
     const repo = await import("../../src/repo.js");
     const created = await repo.createListing(
-      SID,
       input({
         title: "Bright Altbau with balcony",
         bezirk: "Friedrichshain-Kreuzberg",
@@ -99,97 +98,151 @@ describe.skipIf(!run)("listing repo against DynamoDB (local emulator)", () => {
         year: "1905",
         hausgeld: 340,
         balcony: "yes",
-        balconyNote: "South-west, approx. 6 m²",
         pros: ["Stucco", "Balcony"],
-        cons: ["Old kitchen"],
         remodel: { none: false, items: ["Kitchen"], cost: 25000, comment: "" }
       })
     );
-    const read = await repo.getListing(SID, created.id);
-    expect(read).toEqual(created);
+    expect(await repo.getListing(created.id)).toEqual(created);
 
-    const { after } = await repo.updateListing(SID, created.id, {
+    const { after } = await repo.updateListing(created.id, {
       status: "short",
       published: true
     });
     expect(after.status).toBe("short");
-    expect(after.pros).toEqual(["Stucco", "Balcony"]);
+    expect((await repo.listAll()).some((l) => l.id === created.id)).toBe(true);
 
-    const deleted = await repo.deleteListing(SID, created.id);
+    const deleted = await repo.deleteListing(created.id);
     expect(deleted.id).toBe(created.id);
-    expect(await repo.getListing(SID, created.id)).toBeNull();
+    expect(await repo.getListing(created.id)).toBeNull();
   });
 
-  it("benchmark and top-5 ranks stay exclusive", async () => {
+  it("benchmark and top-5 ranks stay exclusive across the pool", async () => {
     const repo = await import("../../src/repo.js");
     const a = await repo.createListing(
-      SID,
       input({ title: "A", benchmark: true, topRank: 1 })
     );
     const b = await repo.createListing(
-      SID,
       input({ title: "B", benchmark: true, topRank: 1 })
     );
-    const all = await repo.listAll(SID);
-    const fa = all.find((l) => l.id === a.id)!;
-    const fb = all.find((l) => l.id === b.id)!;
-    expect(fb.benchmark).toBe(true);
-    expect(fb.topRank).toBe(1);
-    expect(fa.benchmark).toBe(false);
-    expect(fa.topRank).toBe(0);
-
-    // Moving B to rank 2 leaves rank 1 empty rather than reshuffling.
-    await repo.updateListing(SID, b.id, { topRank: 2 });
-    const again = await repo.listAll(SID);
-    expect(again.filter((l) => l.topRank === 1)).toHaveLength(0);
+    const all = await repo.listAll();
+    expect(all.find((l) => l.id === b.id)!.benchmark).toBe(true);
+    expect(all.find((l) => l.id === a.id)!.benchmark).toBe(false);
+    expect(all.find((l) => l.id === a.id)!.topRank).toBe(0);
   });
 
   it("sparse viewings index tracks set and cleared viewing dates", async () => {
     const repo = await import("../../src/repo.js");
     const inTwoDays = new Date(Date.now() + 2 * 86_400_000).toISOString();
     const l = await repo.createListing(
-      SID,
       input({ title: "Viewing soon", viewingAt: inTwoDays })
     );
-
-    const upcoming = await repo.upcomingViewings(14);
-    expect(upcoming.some((x) => x.id === l.id)).toBe(true);
-
-    await repo.updateListing(SID, l.id, { viewingAt: null });
-    const after = await repo.upcomingViewings(14);
-    expect(after.some((x) => x.id === l.id)).toBe(false);
+    expect((await repo.upcomingViewings(14)).some((x) => x.id === l.id)).toBe(true);
+    await repo.updateListing(l.id, { viewingAt: null });
+    expect((await repo.upcomingViewings(14)).some((x) => x.id === l.id)).toBe(false);
   });
 
-  it("inbox: dedupes urls, links and unlinks listings", async () => {
+  it("visibility: criteria matching + share/hide overrides + draft gate", async () => {
+    const repo = await import("../../src/repo.js");
+
+    // Criteria arrive via events: Kreuzberg, ≥70 m², ≥2 beds, 750k all-in.
+    await repo.putCriteria(SID, {
+      brief: briefSchema.parse({
+        budget: 750000,
+        minSqm: 70,
+        minBeds: 2,
+        districts: ["Friedrichshain-Kreuzberg"]
+      }),
+      settings: settingsSchema.parse({ budget: 750000 }),
+      status: "active"
+    });
+
+    const match = await repo.createListing(
+      input({
+        title: "Matches",
+        bezirk: "Friedrichshain-Kreuzberg",
+        price: 489000,
+        sqm: 78,
+        beds: 2,
+        published: true
+      })
+    );
+    const noMatch = await repo.createListing(
+      input({
+        title: "Spandau no-match",
+        bezirk: "Spandau",
+        price: 300000,
+        sqm: 80,
+        beds: 2,
+        published: true
+      })
+    );
+    const draft = await repo.createListing(
+      input({
+        title: "Draft match",
+        bezirk: "Friedrichshain-Kreuzberg",
+        price: 489000,
+        sqm: 78,
+        beds: 2,
+        published: false
+      })
+    );
+
+    let visible = await repo.visibleForSearch(SID);
+    const ids = () => visible.map((v) => v.listing.id);
+    expect(ids()).toContain(match.id);
+    expect(ids()).not.toContain(noMatch.id);
+    expect(ids()).not.toContain(draft.id); // drafts never leak
+
+    // Manual share beats no-match.
+    await repo.putShare(SID, noMatch.id, "shared");
+    visible = await repo.visibleForSearch(SID);
+    expect(ids()).toContain(noMatch.id);
+    expect(visible.find((v) => v.listing.id === noMatch.id)!.reason).toBe("shared");
+
+    // Manual hide beats a match.
+    await repo.putShare(SID, match.id, "hidden");
+    visible = await repo.visibleForSearch(SID);
+    expect(ids()).not.toContain(match.id);
+
+    // Clearing the override returns to auto-matching.
+    await repo.clearShare(SID, match.id);
+    visible = await repo.visibleForSearch(SID);
+    expect(visible.find((v) => v.listing.id === match.id)!.reason).toBe("match");
+
+    // A search with no criteria sees manual shares only.
+    const emptySid = "01JD4WPKXK8Z1Q2W3E4R5T6Y98";
+    expect(await repo.visibleForSearch(emptySid)).toHaveLength(0);
+    await repo.putShare(emptySid, match.id, "shared");
+    const onlyShared = await repo.visibleForSearch(emptySid);
+    expect(onlyShared.map((v) => v.listing.id)).toEqual([match.id]);
+  });
+
+  it("inbox: global, dedupes urls, unlinks on listing delete", async () => {
     const repo = await import("../../src/repo.js");
     const urls = [
       "https://www.immobilienscout24.de/expose/int-1",
       "https://www.immobilienscout24.de/expose/int-2"
     ];
-    const created = await repo.addSources(SID, urls);
+    const created = await repo.addSources(urls);
     expect(created).toHaveLength(2);
-    const again = await repo.addSources(SID, [
-      urls[0]!,
-      "https://www.immobilienscout24.de/expose/int-3"
-    ]);
-    expect(again).toHaveLength(1);
+    expect(
+      await repo.addSources([urls[0]!, "https://www.immobilienscout24.de/expose/int-3"])
+    ).toHaveLength(1);
 
-    const listing = await repo.createListing(SID, input({ title: "From inbox" }));
+    const listing = await repo.createListing(input({ title: "From inbox" }));
     const src = created[0]!;
-    const linked = await repo.updateSource(SID, src.id, {
+    const linked = await repo.updateSource(src.id, {
       status: "done",
       listingId: listing.id
     });
     expect(linked.status).toBe("done");
 
-    // Deleting the listing resets the linked source to pending.
-    await repo.deleteListing(SID, listing.id);
-    const sources = await repo.listSources(SID);
-    const reset = sources.find((s) => s.id === src.id)!;
+    await repo.deleteListing(listing.id);
+    const reset = (await repo.listSources()).find((s) => s.id === src.id)!;
     expect(reset.listingId).toBeNull();
     expect(reset.status).toBe("pending");
 
-    await repo.deleteSource(SID, src.id);
-    expect((await repo.listSources(SID)).some((s) => s.id === src.id)).toBe(false);
+    await repo.deleteSource(src.id);
+    expect((await repo.listSources()).some((s) => s.id === src.id)).toBe(false);
   });
 });

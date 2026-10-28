@@ -51,11 +51,9 @@ export const handler = dispatch({
           "Star ratings can't be saved with viewer access — leave your rating as a comment instead"
         );
       }
-      const meta = await repo.requireListingInSearch(
-        path.listingId,
-        path.searchId,
-        { mustBePublished: true }
-      );
+      const meta = await repo.requireListingActive(path.listingId, {
+        mustBePublished: true
+      });
       const rating: Rating = {
         listingId: path.listingId,
         searchId: path.searchId,
@@ -125,11 +123,9 @@ export const handler = dispatch({
       const role = requireSearchAccess(auth, path.searchId);
       let listingTitle: string | null = null;
       if (body.listingId) {
-        const meta = await repo.requireListingInSearch(
-          body.listingId,
-          path.searchId,
-          { mustBePublished: true }
-        );
+        const meta = await repo.requireListingActive(body.listingId, {
+          mustBePublished: true
+        });
         listingTitle = meta.title;
       }
       if (body.parentId) {

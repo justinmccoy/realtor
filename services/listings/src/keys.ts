@@ -1,15 +1,21 @@
 /** Key layout for listing-table (owned exclusively by the listing service).
- *  GSI1 is a sparse "upcoming viewings" index across all searches: keys are
- *  only present while a listing has a viewing date set. */
+ *
+ *  Global pool (listings have no owning search):
+ *    POOL            / LISTING#<lid>      the listings themselves
+ *    POOL            / SOURCE#<srcId>     the link inbox
+ *  Per-search visibility + matching state:
+ *    SEARCH#<sid>    / SHARE#<lid>        manual share/hide override
+ *    SEARCH#<sid>    / CRITERIA           event-carried copy of brief+settings
+ *  GSI1 is a sparse "upcoming viewings" index: keys exist only while a
+ *  listing has a viewing date set. */
 export const listingKeys = {
-  listing: (searchId: string, listingId: string) => ({
+  listing: (listingId: string) => ({ PK: "POOL", SK: `LISTING#${listingId}` }),
+  source: (sourceId: string) => ({ PK: "POOL", SK: `SOURCE#${sourceId}` }),
+  share: (searchId: string, listingId: string) => ({
     PK: `SEARCH#${searchId}`,
-    SK: `LISTING#${listingId}`
+    SK: `SHARE#${listingId}`
   }),
-  source: (searchId: string, sourceId: string) => ({
-    PK: `SEARCH#${searchId}`,
-    SK: `SOURCE#${sourceId}`
-  }),
+  criteria: (searchId: string) => ({ PK: `SEARCH#${searchId}`, SK: "CRITERIA" }),
   viewingGsi: (viewingAt: string, listingId: string) => ({
     GSI1PK: "VIEWING",
     GSI1SK: `${viewingAt}#${listingId}`

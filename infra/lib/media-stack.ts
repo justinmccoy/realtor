@@ -104,7 +104,13 @@ export class MediaStack extends Stack {
       eventBus: bus,
       eventPattern: {
         source: ["jj.listing"],
-        detailType: ["listing.published", "listing.unpublished", "listing.deleted"]
+        detailType: [
+          "listing.created",
+          "listing.updated",
+          "listing.published",
+          "listing.unpublished",
+          "listing.deleted"
+        ]
       },
       targets: [new targets.LambdaFunction(eventsFn, { retryAttempts: 2 })]
     });
@@ -114,31 +120,31 @@ export class MediaStack extends Stack {
     const { httpApi, adminAuthorizer, customerAuthorizer } = routes;
 
     httpApi.addRoutes({
-      path: "/api/v1/admin/searches/{searchId}/photos",
+      path: "/api/v1/admin/listings/{listingId}/photos",
       methods: [HttpMethod.GET],
       integration: adminInt,
       authorizer: adminAuthorizer
     });
     httpApi.addRoutes({
-      path: "/api/v1/admin/searches/{searchId}/listings/{listingId}/photos/presign",
+      path: "/api/v1/admin/listings/{listingId}/photos/presign",
       methods: [HttpMethod.POST],
       integration: adminInt,
       authorizer: adminAuthorizer
     });
     httpApi.addRoutes({
-      path: "/api/v1/admin/searches/{searchId}/listings/{listingId}/photos/order",
+      path: "/api/v1/admin/listings/{listingId}/photos/order",
       methods: [HttpMethod.PATCH],
       integration: adminInt,
       authorizer: adminAuthorizer
     });
     httpApi.addRoutes({
-      path: "/api/v1/admin/searches/{searchId}/listings/{listingId}/photos/{photoId}/confirm",
+      path: "/api/v1/admin/listings/{listingId}/photos/{photoId}/confirm",
       methods: [HttpMethod.POST],
       integration: adminInt,
       authorizer: adminAuthorizer
     });
     httpApi.addRoutes({
-      path: "/api/v1/admin/searches/{searchId}/listings/{listingId}/photos/{photoId}",
+      path: "/api/v1/admin/listings/{listingId}/photos/{photoId}",
       methods: [HttpMethod.DELETE],
       integration: adminInt,
       authorizer: adminAuthorizer

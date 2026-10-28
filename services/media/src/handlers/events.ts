@@ -6,25 +6,30 @@ import * as s3 from "../s3.js";
 
 /**
  * Consumes listing-service domain events:
- *  - listing.published / listing.unpublished → event-carried visibility flag
- *    (lets the customer photo endpoint filter without cross-service reads)
+ *  - listing.created/updated carry payload.published → keep the active flag
+ *  - listing.published / listing.unpublished → flip it
  *  - listing.deleted → remove photo metadata and S3 objects
  */
 export const handler: EventBridgeHandler<string, DomainEvent, void> = async (
   event
 ) => {
   const detail = event.detail;
-  const { listingId, searchId } = detail;
+  const { listingId } = detail;
   if (!listingId) {
     logger.warn("listing event without listingId", { type: event["detail-type"] });
     return;
   }
+  const payload = (detail.payload ?? {}) as { published?: boolean };
   switch (event["detail-type"]) {
+    case "listing.created":
+    case "listing.updated":
+      await repo.setPublished(listingId, payload.published ?? false);
+      break;
     case "listing.published":
-      await repo.setPublished(listingId, searchId ?? "", true);
+      await repo.setPublished(listingId, true);
       break;
     case "listing.unpublished":
-      await repo.setPublished(listingId, searchId ?? "", false);
+      await repo.setPublished(listingId, false);
       break;
     case "listing.deleted": {
       const keys = await repo.deleteAllForListing(listingId);

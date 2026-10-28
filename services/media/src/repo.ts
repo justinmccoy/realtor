@@ -8,7 +8,7 @@ import {
 } from "@aws-sdk/lib-dynamodb";
 import { ddb, tableName } from "@jj/lambda-kit";
 import { ApiError, photoSchema, type Photo, type PhotoKind } from "@jj/shared";
-import { mediaKeys, SEARCH_PHOTOS_INDEX } from "./keys.js";
+import { mediaKeys } from "./keys.js";
 
 const T = (): string => tableName("MEDIA_TABLE");
 
@@ -16,16 +16,13 @@ export function itemToPhoto(item: Record<string, unknown>): Photo {
   return photoSchema.parse(item);
 }
 
-function photoItem(p: Photo): Record<string, unknown> {
-  return {
-    ...mediaKeys.photo(p.listingId, p.id),
-    ...mediaKeys.photoGsi(p.searchId, p.listingId, p.id),
-    ...p
-  };
-}
-
 export async function putPhoto(p: Photo): Promise<void> {
-  await ddb().send(new PutCommand({ TableName: T(), Item: photoItem(p) }));
+  await ddb().send(
+    new PutCommand({
+      TableName: T(),
+      Item: { ...mediaKeys.photo(p.listingId, p.id), ...p }
+    })
+  );
 }
 
 export async function getPhoto(
@@ -70,25 +67,6 @@ export async function listByListing(listingId: string): Promise<Photo[]> {
   return (res.Items ?? [])
     .map(itemToPhoto)
     .sort((a, b) => a.sortOrder - b.sortOrder);
-}
-
-export async function listBySearch(searchId: string): Promise<Photo[]> {
-  const items: Record<string, unknown>[] = [];
-  let lastKey: Record<string, unknown> | undefined;
-  do {
-    const res = await ddb().send(
-      new QueryCommand({
-        TableName: T(),
-        IndexName: SEARCH_PHOTOS_INDEX,
-        KeyConditionExpression: "GSI1PK = :p",
-        ExpressionAttributeValues: { ":p": `SEARCH#${searchId}` },
-        ExclusiveStartKey: lastKey
-      })
-    );
-    items.push(...(res.Items ?? []));
-    lastKey = res.LastEvaluatedKey;
-  } while (lastKey && items.length < 5000);
-  return items.map(itemToPhoto).sort((a, b) => a.sortOrder - b.sortOrder);
 }
 
 export async function nextSortOrder(listingId: string): Promise<number> {
@@ -148,24 +126,23 @@ export async function deleteAllForListing(listingId: string): Promise<string[]> 
   return photos.map((p) => p.s3Key);
 }
 
-/* ---------- event-carried listing visibility ---------- */
+/* ---------- event-carried listing state ---------- */
 
 export async function setPublished(
   listingId: string,
-  searchId: string,
   published: boolean
 ): Promise<void> {
   await ddb().send(
     new UpdateCommand({
       TableName: T(),
       Key: mediaKeys.listingMeta(listingId),
-      UpdateExpression: "SET published = :p, searchId = :s",
-      ExpressionAttributeValues: { ":p": published, ":s": searchId }
+      UpdateExpression: "SET published = :p",
+      ExpressionAttributeValues: { ":p": published }
     })
   );
 }
 
-/** listingId -> published (missing META = never published = false). */
+/** listingId -> active flag (missing META = never activated = false). */
 export async function publishedMap(
   listingIds: string[]
 ): Promise<Record<string, boolean>> {

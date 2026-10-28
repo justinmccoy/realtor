@@ -4,6 +4,7 @@ export * from "./costs.js";
 export * from "./errors.js";
 export * from "./pagination.js";
 export * from "./events.js";
+export * from "./matching.js";
 export * from "./schemas/search.js";
 export * from "./schemas/listing.js";
 export * from "./schemas/engagement.js";
