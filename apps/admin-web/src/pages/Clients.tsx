@@ -28,53 +28,83 @@ export function Clients({
   onChanged: () => void;
 }) {
   const [rows, setRows] = useState<ClientRow[] | null>(null);
+  const [loadError, setLoadError] = useState("");
+  const [partial, setPartial] = useState("");
   const [toastEl, toast] = useToast();
 
   const load = useCallback(async () => {
-    const perSearch = await Promise.all(
-      searches.map(async (search) => {
-        const [detail, listings, ratings, comments] = await Promise.all([
-          api.searchDetail(search.id),
-          api.listings(search.id),
-          api.ratings(search.id),
-          api.comments(search.id)
-        ]);
-        return { search, detail, listings, ratings, comments };
-      })
-    );
-    const cutoff = Date.now() - 30 * 86_400_000;
-    const built: ClientRow[] = [];
-    for (const { search, detail, listings, ratings, comments } of perSearch) {
-      for (const member of detail.members) {
-        const mine = ratings.items.filter((r) => r.userId === member.userId);
-        const activity = await api.activity({
-          actorId: member.userId,
-          limit: 100
-        });
-        built.push({
-          member,
-          search,
-          publishedListings: listings.items.filter((l) => l.published).length,
-          totalListings: listings.items.length,
-          ratingsGiven: mine.length,
-          avgScore: mine.length
-            ? mine.reduce((a, r) => a + r.score, 0) / mine.length
-            : null,
-          commentsPosted: comments.items.filter(
-            (c) => c.authorId === member.userId && !c.deletedAt
-          ).length,
-          events30d: activity.items.filter(
-            (e) => new Date(e.at).getTime() >= cutoff
-          ).length
-        });
+    setLoadError("");
+    setPartial("");
+    try {
+      // One failing search must not blank the whole page.
+      const settled = await Promise.allSettled(
+        searches.map(async (search) => {
+          const [detail, listings, ratings, comments] = await Promise.all([
+            api.searchDetail(search.id),
+            api.listings(search.id),
+            api.ratings(search.id),
+            api.comments(search.id)
+          ]);
+          return { search, detail, listings, ratings, comments };
+        })
+      );
+      const failed: string[] = [];
+      const perSearch = settled.flatMap((r, i) => {
+        if (r.status === "fulfilled") return [r.value];
+        failed.push(
+          `${searches[i]?.clientName ?? "?"}: ${
+            r.reason instanceof Error ? r.reason.message : String(r.reason)
+          }`
+        );
+        return [];
+      });
+      const cutoff = Date.now() - 30 * 86_400_000;
+      const built: ClientRow[] = [];
+      for (const { search, detail, listings, ratings, comments } of perSearch) {
+        for (const member of detail.members) {
+          const mine = ratings.items.filter((r) => r.userId === member.userId);
+          // Activity is nice-to-have; never let it block the roster.
+          let events30d = 0;
+          try {
+            const activity = await api.activity({
+              actorId: member.userId,
+              limit: 100
+            });
+            events30d = activity.items.filter(
+              (e) => new Date(e.at).getTime() >= cutoff
+            ).length;
+          } catch {
+            /* column shows 0; the page still renders */
+          }
+          built.push({
+            member,
+            search,
+            publishedListings: listings.items.filter((l) => l.published).length,
+            totalListings: listings.items.length,
+            ratingsGiven: mine.length,
+            avgScore: mine.length
+              ? mine.reduce((a, r) => a + r.score, 0) / mine.length
+              : null,
+            commentsPosted: comments.items.filter(
+              (c) => c.authorId === member.userId && !c.deletedAt
+            ).length,
+            events30d
+          });
+        }
       }
+      built.sort(
+        (a, b) =>
+          (b.member.lastSeenAt ?? "").localeCompare(a.member.lastSeenAt ?? "") ||
+          a.member.displayName.localeCompare(b.member.displayName)
+      );
+      setRows(built);
+      if (failed.length) {
+        setPartial(`Couldn't load ${failed.length} search(es): ${failed.join(" · ")}`);
+      }
+    } catch (e) {
+      setRows([]);
+      setLoadError(e instanceof Error ? e.message : "Couldn't load clients");
     }
-    built.sort(
-      (a, b) =>
-        (b.member.lastSeenAt ?? "").localeCompare(a.member.lastSeenAt ?? "") ||
-        a.member.displayName.localeCompare(b.member.displayName)
-    );
-    setRows(built);
   }, [searches]);
 
   useEffect(() => {
@@ -173,6 +203,15 @@ export function Clients({
         </div>
       </form>
 
+      {loadError && (
+        <div className="bulkbar">
+          <span className="err">{loadError}</span>
+          <button className="btn" type="button" onClick={() => void load()}>
+            Retry
+          </button>
+        </div>
+      )}
+      {partial && <p className="note-line">{partial}</p>}
       {rows === null ? (
         <div className="loading">Loading clients…</div>
       ) : rows.length === 0 ? (
