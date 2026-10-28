@@ -1,0 +1,349 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AWS Setup Runbook — JJ Berlin House Search</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap">
+<style>
+  :root{
+    --bg:#E9C3B3; --surface:#FFFAF7; --sunk:#F7E6DE; --ink:#2B1A14; --muted:#6F554B;
+    --line:#E3C2B4; --accent:#17694A; --accent-ink:#fff; --accent-soft:#DCEDE4;
+    --sign:#F2C230; --sign-ink:#2A2208; --warn:#B4441F; --warn-soft:#F7E2D9;
+    --code-bg:#2B1A14; --code-ink:#F4E7E1;
+    color-scheme:light;
+  }
+  @media (prefers-color-scheme:dark){:root{
+    --bg:#2B1813; --surface:#3A231C; --sunk:#311D17; --ink:#F4E7E1; --muted:#C6A79B;
+    --line:#55362C; --accent:#52B488; --accent-ink:#0E1A14; --accent-soft:#1D3328;
+    --sign:#E6B92A; --sign-ink:#221B05; --warn:#EE8A63; --warn-soft:#3A2219;
+    --code-bg:#1d110d; --code-ink:#F4E7E1; color-scheme:dark;
+  }}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 "Barlow",system-ui,sans-serif}
+  .wrap{max-width:880px;margin:0 auto;padding:32px 20px 80px;display:flex;flex-direction:column;gap:22px}
+  h1,h2,h3{font-family:"Barlow Condensed","Arial Narrow",sans-serif;line-height:1.08;margin:0}
+  h1{font-size:clamp(36px,6vw,54px);font-weight:700}
+  h1 .u{background:var(--sign);color:var(--sign-ink);padding:0 .18em;border-radius:4px}
+  .eyebrow{font-family:"Barlow Condensed";font-weight:600;letter-spacing:.12em;text-transform:uppercase;font-size:13px;color:var(--muted)}
+  .lead{font-size:16px;max-width:64ch}
+  .step{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:22px 24px;display:flex;flex-direction:column;gap:12px;scroll-margin-top:16px}
+  .step-h{display:flex;align-items:center;gap:14px}
+  .n{flex:none;width:40px;height:40px;border-radius:50%;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;font-family:"Barlow Condensed";font-size:22px;font-weight:700}
+  .step h2{font-size:26px;font-weight:600;flex:1}
+  .time{font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);white-space:nowrap}
+  .step.done{opacity:.72}
+  .step.done .n{background:var(--sign);color:var(--sign-ink)}
+  .donebox{display:flex;gap:8px;align-items:center;font-size:13px;color:var(--muted);cursor:pointer;user-select:none}
+  .donebox input{accent-color:var(--accent);width:17px;height:17px}
+  p{margin:0}
+  ul,ol{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:6px}
+  a{color:var(--accent);font-weight:600}
+  code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.92em;background:var(--sunk);padding:1px 5px;border-radius:4px}
+  pre{position:relative;background:var(--code-bg);color:var(--code-ink);border-radius:8px;padding:14px 16px;overflow-x:auto;margin:0}
+  pre code{background:none;padding:0;color:inherit;font-size:13px;line-height:1.5}
+  pre .copy{position:absolute;top:8px;right:8px;border:1px solid color-mix(in srgb,var(--code-ink) 30%,transparent);background:transparent;color:var(--code-ink);border-radius:6px;font:600 11px "Barlow";padding:4px 9px;cursor:pointer;opacity:.75}
+  pre .copy:hover{opacity:1}
+  .note{border-left:4px solid var(--sign);background:var(--sunk);border-radius:0 8px 8px 0;padding:10px 14px;font-size:14px}
+  .warn{border-left:4px solid var(--warn);background:var(--warn-soft);border-radius:0 8px 8px 0;padding:10px 14px;font-size:14px}
+  .ok{border-left:4px solid var(--accent);background:var(--accent-soft);border-radius:0 8px 8px 0;padding:10px 14px;font-size:14px}
+  .ph{color:var(--sign);font-weight:700}
+  details{border:1px solid var(--line);border-radius:8px;padding:10px 14px}
+  details summary{cursor:pointer;font-weight:600;color:var(--accent)}
+  details[open]{display:flex;flex-direction:column;gap:10px}
+  table{border-collapse:collapse;font-size:14px;width:100%}
+  th{text-align:left;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);border-bottom:2px solid var(--ink);padding:8px 10px}
+  td{border-bottom:1px solid var(--line);padding:8px 10px;vertical-align:top}
+  .toc{display:flex;flex-wrap:wrap;gap:6px}
+  .toc a{border:1px solid var(--line);background:var(--surface);border-radius:99px;padding:5px 12px;font-size:13px;text-decoration:none;color:var(--ink)}
+  .toc a:hover{border-color:var(--accent);color:var(--accent)}
+  .field-table td:first-child{font-weight:600;white-space:nowrap}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="eyebrow">Runbook · AWS account → running dev environment</div>
+  <h1>Deploy <span class="u">Berlin Calling</span></h1>
+</header>
+
+<p class="lead">
+  Everything from a brand-new AWS account to a working dev deployment of the
+  apartment-search platform, plus the CI/CD hookup for the
+  <code>justinmccoy/realtor</code> repo. Anything shown
+  <span class="ph">&lt;LIKE_THIS&gt;</span> is a placeholder you replace.
+  Checkboxes save locally, so you can close this page and pick up where you left off.
+</p>
+
+<nav class="toc">
+  <a href="#s1">1 Account</a><a href="#s2">2 Secure root</a><a href="#s3">3 Admin identity</a>
+  <a href="#s4">4 Budget alarm</a><a href="#s5">5 CLI</a><a href="#s6">6 CDK bootstrap</a>
+  <a href="#s7">7 Deploy dev</a><a href="#s8">8 First admin</a><a href="#s9">9 Seed &amp; verify</a>
+  <a href="#s10">10 CI/CD role</a><a href="#s11">Troubleshooting</a>
+</nav>
+
+<!-- 1 -->
+<section class="step" id="s1">
+  <div class="step-h"><span class="n">1</span><h2>Create the AWS account</h2><span class="time">~10 min</span></div>
+  <p>Skip to <a href="#s2">step 2</a> if you already have an account you want to use.</p>
+  <ol>
+    <li>Go to <a href="https://aws.amazon.com/free" target="_blank" rel="noopener">aws.amazon.com/free</a> → <b>Create an AWS account</b>.</li>
+    <li>Use an email you control long-term (an alias like <code>you+aws@…</code> works). This becomes the <b>root user</b>.</li>
+    <li>Account name: anything (<code>jj-realtor</code> is fine). Pick <b>Personal</b>.</li>
+    <li>Add a credit card (required even on the free tier), verify your phone, choose the <b>Basic (free)</b> support plan.</li>
+  </ol>
+  <div class="note">New accounts can take a few minutes to fully activate. If a later step says the account isn't ready, wait 10 minutes and retry.</div>
+  <label class="donebox"><input type="checkbox" data-done="s1"> Mark step 1 done</label>
+</section>
+
+<!-- 2 -->
+<section class="step" id="s2">
+  <div class="step-h"><span class="n">2</span><h2>Secure the root user</h2><span class="time">~5 min</span></div>
+  <p>The root user can do (and spend) anything. You'll use it exactly twice — here, and never again for daily work.</p>
+  <ol>
+    <li>Sign in to the <a href="https://console.aws.amazon.com/" target="_blank" rel="noopener">AWS Console</a> as root.</li>
+    <li>Top-right account menu → <b>Security credentials</b>.</li>
+    <li>Under <b>Multi-factor authentication</b> → <b>Assign MFA device</b> → Authenticator app → scan the QR with the same authenticator you'll use for the admin site.</li>
+    <li>Confirm there are <b>no root access keys</b> (section "Access keys" should be empty — never create one).</li>
+    <li>Note your 12-digit <b>Account ID</b> from the same menu — you'll need it everywhere below as <span class="ph">&lt;ACCOUNT_ID&gt;</span>.</li>
+  </ol>
+  <label class="donebox"><input type="checkbox" data-done="s2"> Mark step 2 done</label>
+</section>
+
+<!-- 3 -->
+<section class="step" id="s3">
+  <div class="step-h"><span class="n">3</span><h2>Create your admin identity (IAM Identity Center)</h2><span class="time">~10 min</span></div>
+  <p>Daily work happens as an SSO user with short-lived credentials — no long-lived access keys on your laptop.</p>
+  <ol>
+    <li>Console search → <b>IAM Identity Center</b> → <b>Enable</b> (accept the default "organization instance"; region prompt: pick <b>Europe (Frankfurt) eu-central-1</b>).</li>
+    <li>Note the <b>AWS access portal URL</b> shown on the dashboard (like <code>https://d-xxxxxxxxxx.awsapps.com/start</code>) — call it <span class="ph">&lt;SSO_START_URL&gt;</span>.</li>
+    <li><b>Users → Add user</b>: username <code>justin</code>, your email, name. Accept the email invite and set a password + MFA.</li>
+    <li><b>Permission sets → Create permission set → Predefined → AdministratorAccess</b> → create.</li>
+    <li><b>AWS accounts</b> → tick your account → <b>Assign users or groups</b> → pick <code>justin</code> → pick <b>AdministratorAccess</b> → submit.</li>
+  </ol>
+  <details>
+    <summary>Shortcut if you'd rather not set up Identity Center (less secure)</summary>
+    <p>Create a classic IAM user instead: Console → IAM → Users → Create user <code>justin-cli</code> → attach <b>AdministratorAccess</b> → create an access key ("CLI use") → run <code>aws configure</code> with the key, secret, and region <code>eu-central-1</code>. Works with every command below (drop the <code>--profile jj</code> parts). Long-lived keys on disk are the trade-off.</p>
+  </details>
+  <label class="donebox"><input type="checkbox" data-done="s3"> Mark step 3 done</label>
+</section>
+
+<!-- 4 -->
+<section class="step" id="s4">
+  <div class="step-h"><span class="n">4</span><h2>Set a budget alarm</h2><span class="time">~3 min</span></div>
+  <p>This stack costs ~$2–3/mo for dev (and ~$15–18 for prod later). An alarm catches surprises — a misconfigured loop, a forgotten NAT gateway, anything.</p>
+  <ol>
+    <li>Console → <b>Billing and Cost Management → Budgets → Create budget</b>.</li>
+    <li>Template: <b>Monthly cost budget</b>, amount <b>$25</b>, your email as recipient. Done.</li>
+  </ol>
+  <label class="donebox"><input type="checkbox" data-done="s4"> Mark step 4 done</label>
+</section>
+
+<!-- 5 -->
+<section class="step" id="s5">
+  <div class="step-h"><span class="n">5</span><h2>Install &amp; configure the AWS CLI</h2><span class="time">~5 min</span></div>
+<pre><code>brew install awscli
+aws --version        # want: aws-cli/2.x</code></pre>
+  <p>Configure an SSO profile named <code>jj</code> (answers shown after each prompt):</p>
+<pre><code>aws configure sso
+# SSO session name:      jj
+# SSO start URL:         &lt;SSO_START_URL&gt;
+# SSO region:            eu-central-1
+# SSO registration scopes: (press Enter for default)
+# → browser opens: sign in as justin, Allow
+# Pick your account + AdministratorAccess
+# Default client region: eu-central-1
+# Output format:         json
+# Profile name:          jj</code></pre>
+  <p>Make it the default for this shell and verify:</p>
+<pre><code>export AWS_PROFILE=jj          # add to ~/.zshrc to make it stick
+aws sts get-caller-identity    # shows your &lt;ACCOUNT_ID&gt;</code></pre>
+  <div class="note">SSO sessions expire (usually 8–12 h). When any aws/cdk command says credentials are expired: <code>aws sso login</code> and re-run.</div>
+  <label class="donebox"><input type="checkbox" data-done="s5"> Mark step 5 done</label>
+</section>
+
+<!-- 6 -->
+<section class="step" id="s6">
+  <div class="step-h"><span class="n">6</span><h2>Bootstrap CDK (once per account)</h2><span class="time">~5 min</span></div>
+  <p>Bootstrapping creates the S3 bucket and IAM roles CDK deploys through. Two regions: <code>eu-central-1</code> for everything, and <code>us-east-1</code> because CloudFront requires its WAF + certificates to live there.</p>
+<pre><code>cd ~/JDevelops/JJ-ApartmentSearchTool
+export AWS_PROFILE=jj
+pnpm install
+pnpm --filter @jj/infra exec cdk bootstrap aws://&lt;ACCOUNT_ID&gt;/eu-central-1
+pnpm --filter @jj/infra exec cdk bootstrap aws://&lt;ACCOUNT_ID&gt;/us-east-1</code></pre>
+  <div class="ok">Success looks like: <code>✅ Environment aws://…/eu-central-1 bootstrapped.</code></div>
+  <label class="donebox"><input type="checkbox" data-done="s6"> Mark step 6 done</label>
+</section>
+
+<!-- 7 -->
+<section class="step" id="s7">
+  <div class="step-h"><span class="n">7</span><h2>Deploy the dev environment</h2><span class="time">~15 min</span></div>
+<pre><code>pnpm deploy:dev</code></pre>
+  <p>That deploys all 12 stacks (<code>JJ-dev-Platform</code>, <code>-Auth</code>, <code>-SearchData</code>, <code>-Edge</code>, <code>-Api</code>, <code>-Frontend</code>, and the six services). First run takes ~10–15 min — CloudFront distributions are the slow part. Then publish the two web apps:</p>
+<pre><code>./scripts/deploy-frontends.sh dev</code></pre>
+  <p>The script ends by printing your two URLs:</p>
+<pre><code>  customer: https://dXXXXXXXXXXXX.cloudfront.net
+  admin:    https://dYYYYYYYYYYYY.cloudfront.net</code></pre>
+  <p>Save them — referenced below as <span class="ph">&lt;CUSTOMER_URL&gt;</span> and <span class="ph">&lt;ADMIN_URL&gt;</span>.</p>
+  <label class="donebox"><input type="checkbox" data-done="s7"> Mark step 7 done</label>
+</section>
+
+<!-- 8 -->
+<section class="step" id="s8">
+  <div class="step-h"><span class="n">8</span><h2>Create the first admin (you)</h2><span class="time">~5 min</span></div>
+  <p>Admins can't self-register — create the account and put it in the <code>admin</code> group:</p>
+<pre><code>POOL_ID=$(aws cloudformation describe-stacks --stack-name JJ-dev-Auth \
+  --query "Stacks[0].Outputs[?OutputKey=='AdminPoolId'].OutputValue" --output text)
+
+aws cognito-idp admin-create-user --user-pool-id "$POOL_ID" \
+  --username &lt;YOUR_EMAIL&gt; \
+  --user-attributes Name=email,Value=&lt;YOUR_EMAIL&gt; \
+      Name=email_verified,Value=true Name=name,Value="JJ"
+
+aws cognito-idp admin-add-user-to-group --user-pool-id "$POOL_ID" \
+  --username &lt;YOUR_EMAIL&gt; --group-name admin</code></pre>
+  <p>Cognito emails you a temporary password. Now open <span class="ph">&lt;ADMIN_URL&gt;</span> and sign in:</p>
+  <ol>
+    <li>Email + the temporary password from the email.</li>
+    <li>Set your real password (14+ chars, upper/lower/digit/symbol).</li>
+    <li>Enrol MFA: the page shows a TOTP secret — add it to your authenticator app, enter the 6-digit code.</li>
+  </ol>
+  <div class="warn">Without the <code>admin-add-user-to-group</code> call, sign-in works but every API call returns 403 — the group claim is what authorizes admin routes.</div>
+  <label class="donebox"><input type="checkbox" data-done="s8"> Mark step 8 done</label>
+</section>
+
+<!-- 9 -->
+<section class="step" id="s9">
+  <div class="step-h"><span class="n">9</span><h2>Seed data &amp; verify end-to-end</h2><span class="time">~10 min</span></div>
+  <p>Load the example Berlin content (8 listings, brief, hours):</p>
+<pre><code>export SEED_API_BASE=&lt;CUSTOMER_URL&gt;
+export SEED_ADMIN_POOL_ID=$POOL_ID
+export SEED_ADMIN_CLIENT_ID=$(aws cloudformation describe-stacks --stack-name JJ-dev-Auth \
+  --query "Stacks[0].Outputs[?OutputKey=='AdminClientId'].OutputValue" --output text)
+
+npx tsx scripts/seed.ts --env dev
+# prompts: admin email, password, TOTP code</code></pre>
+  <p>Verification checklist:</p>
+  <ul>
+    <li><b>Admin app</b> (<span class="ph">&lt;ADMIN_URL&gt;</span>): the "Brian" search appears; Listings shows 8 rows; publish toggles work; upload a photo on one listing.</li>
+    <li><b>Invite a client</b>: Search → Members → invite an email you control (role <i>client</i>).</li>
+    <li><b>Customer app</b> (<span class="ph">&lt;CUSTOMER_URL&gt;</span>): sign in with the emailed temp password → set your own → the board renders with the artifact design; rate a listing; post a comment.</li>
+    <li><b>Tracking loop</b>: back in the admin app → Engagement — your clicks from the customer app show up (expands, photo views), and Dashboard shows "last client activity".</li>
+  </ul>
+  <label class="donebox"><input type="checkbox" data-done="s9"> Mark step 9 done</label>
+</section>
+
+<!-- 10 -->
+<section class="step" id="s10">
+  <div class="step-h"><span class="n">10</span><h2>Wire up CI/CD (GitHub → AWS)</h2><span class="time">~10 min</span></div>
+  <p>Lets the <code>Deploy</code> workflow in <code>justinmccoy/realtor</code> deploy on push — no AWS keys stored in GitHub, just an OIDC trust.</p>
+
+  <p><b>10a — OIDC provider</b> (once per account):</p>
+<pre><code>aws iam create-open-id-connect-provider \
+  --url https://token.actions.githubusercontent.com \
+  --client-id-list sts.amazonaws.com</code></pre>
+
+  <p><b>10b — the deploy role.</b> Save as <code>trust.json</code>:</p>
+<pre><code>{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Effect": "Allow",
+    "Principal": {
+      "Federated": "arn:aws:iam::&lt;ACCOUNT_ID&gt;:oidc-provider/token.actions.githubusercontent.com"
+    },
+    "Action": "sts:AssumeRoleWithWebIdentity",
+    "Condition": {
+      "StringEquals": { "token.actions.githubusercontent.com:aud": "sts.amazonaws.com" },
+      "StringLike":  { "token.actions.githubusercontent.com:sub": "repo:justinmccoy/realtor:*" }
+    }
+  }]
+}</code></pre>
+  <p>Save as <code>deploy-policy.json</code> (CDK does the heavy lifting through its own bootstrap roles; this role only assumes them, reads stack outputs, and publishes the frontends):</p>
+<pre><code>{
+  "Version": "2012-10-17",
+  "Statement": [
+    { "Sid": "AssumeCdkRoles", "Effect": "Allow",
+      "Action": "sts:AssumeRole",
+      "Resource": "arn:aws:iam::&lt;ACCOUNT_ID&gt;:role/cdk-*" },
+    { "Sid": "ReadStackOutputs", "Effect": "Allow",
+      "Action": "cloudformation:DescribeStacks", "Resource": "*" },
+    { "Sid": "PublishFrontends", "Effect": "Allow",
+      "Action": ["s3:ListBucket","s3:GetObject","s3:PutObject","s3:DeleteObject"],
+      "Resource": [
+        "arn:aws:s3:::jj-customer-web-*", "arn:aws:s3:::jj-customer-web-*/*",
+        "arn:aws:s3:::jj-admin-web-*",    "arn:aws:s3:::jj-admin-web-*/*" ] },
+    { "Sid": "InvalidateCache", "Effect": "Allow",
+      "Action": "cloudfront:CreateInvalidation", "Resource": "*" }
+  ]
+}</code></pre>
+<pre><code>aws iam create-role --role-name gh-deploy-realtor \
+  --assume-role-policy-document file://trust.json
+aws iam put-role-policy --role-name gh-deploy-realtor \
+  --policy-name deploy --policy-document file://deploy-policy.json
+aws iam get-role --role-name gh-deploy-realtor \
+  --query Role.Arn --output text     # ← copy this ARN</code></pre>
+
+  <p><b>10c — GitHub side</b> (or via the web UI under Settings):</p>
+<pre><code>gh secret set AWS_DEPLOY_ROLE_ARN --repo justinmccoy/realtor \
+  --body "arn:aws:iam::&lt;ACCOUNT_ID&gt;:role/gh-deploy-realtor"
+gh api -X PUT repos/justinmccoy/realtor/environments/dev
+gh api -X PUT repos/justinmccoy/realtor/environments/production</code></pre>
+  <p>Then in the browser: repo → <b>Settings → Environments → production → Required reviewers</b> → add yourself. That checkbox <em>is</em> the manual approval gate before prod deploys.</p>
+  <p>Test it: push any commit to <code>main</code> (or Actions → Deploy → Run workflow). Expect: <b>verify ✓ → deploy-dev ✓ → deploy-prod ⏸ waiting for your approval</b>.</p>
+  <div class="note">Approving deploy-prod the first time creates the whole prod environment (~$15–18/mo, WAF included). Leave it unapproved until you actually want prod.</div>
+  <label class="donebox"><input type="checkbox" data-done="s10"> Mark step 10 done</label>
+</section>
+
+<!-- 11 -->
+<section class="step" id="s11">
+  <div class="step-h"><span class="n">⚑</span><h2>Troubleshooting</h2></div>
+  <table>
+    <tr><th>Symptom</th><th>Fix</th></tr>
+    <tr><td><code>Unable to locate credentials</code> / <code>token has expired</code></td><td><code>aws sso login</code>, and check <code>echo $AWS_PROFILE</code> says <code>jj</code>.</td></tr>
+    <tr><td><code>cdk bootstrap</code>: <code>AccessDenied</code></td><td>You're not on the Administrator permission set — re-check step 3.5, then <code>aws sso login</code>.</td></tr>
+    <tr><td><code>deploy</code>: <code>…is not bootstrapped</code> mentioning <b>us-east-1</b></td><td>Run the second bootstrap command from step 6 — the Edge stack lives in us-east-1.</td></tr>
+    <tr><td>Frontend loads but shows "Missing configuration"</td><td>You opened a local dev build without <code>.env.local</code>. The deployed CloudFront URLs are configured by <code>deploy-frontends.sh</code>; re-run it after infra changes.</td></tr>
+    <tr><td>Admin sign-in OK but every page errors 403</td><td>User isn't in the <code>admin</code> group — step 8's second command.</td></tr>
+    <tr><td>Invite email never arrives</td><td>Check spam. Cognito's default mailer is fine at this scale; resend by re-inviting the same email (idempotent).</td></tr>
+    <tr><td>GitHub deploy job: <code>Not authorized to perform sts:AssumeRoleWithWebIdentity</code></td><td>Trust policy <code>sub</code> must match <code>repo:justinmccoy/realtor:*</code> exactly; OIDC provider from 10a must exist.</td></tr>
+    <tr><td>Nuke everything (dev)</td><td><code>pnpm --filter @jj/infra exec cdk destroy -c env=dev --all</code></td></tr>
+  </table>
+</section>
+
+<section class="step">
+  <div class="step-h"><span class="n">€</span><h2>What this will cost</h2></div>
+  <table>
+    <tr><th>Environment</th><th>Monthly</th><th>Drivers</th></tr>
+    <tr><td>dev only (steps 1–9)</td><td>~$2–3</td><td>CloudWatch logs; everything else free-tier at this traffic</td></tr>
+    <tr><td>dev + prod</td><td>~$20</td><td>+WAF ($11), prod log retention, CloudFront</td></tr>
+  </table>
+  <p>Dev can be destroyed when idle and redeployed in ~15 minutes — nothing but the data is lost, and the seed script restores that.</p>
+</section>
+
+</div>
+<script>
+  // copy buttons
+  document.querySelectorAll("pre").forEach(pre => {
+    const b = document.createElement("button");
+    b.className = "copy"; b.type = "button"; b.textContent = "copy";
+    b.onclick = () => {
+      navigator.clipboard.writeText(pre.querySelector("code").innerText);
+      b.textContent = "copied"; setTimeout(() => (b.textContent = "copy"), 1200);
+    };
+    pre.appendChild(b);
+  });
+  // persistent checkboxes
+  document.querySelectorAll("[data-done]").forEach(cb => {
+    const key = "runbook-" + cb.dataset.done;
+    const apply = () => cb.closest(".step").classList.toggle("done", cb.checked);
+    cb.checked = localStorage.getItem(key) === "1";
+    apply();
+    cb.addEventListener("change", () => {
+      localStorage.setItem(key, cb.checked ? "1" : "0"); apply();
+    });
+  });
+</script>
+</body>
+</html>
