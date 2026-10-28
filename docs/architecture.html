@@ -1,0 +1,440 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Architecture — JJ Berlin House Search</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap">
+<style>
+  :root{
+    --bg:#E9C3B3; --surface:#FFFAF7; --sunk:#F7E6DE; --ink:#2B1A14; --muted:#6F554B;
+    --line:#E3C2B4; --accent:#17694A; --accent-ink:#fff; --accent-soft:#DCEDE4;
+    --sign:#F2C230; --sign-ink:#2A2208; --warn:#B4441F; --warn-soft:#F7E2D9;
+    --blue:#2F5E9E; color-scheme:light;
+  }
+  @media (prefers-color-scheme:dark){:root{
+    --bg:#2B1813; --surface:#3A231C; --sunk:#311D17; --ink:#F4E7E1; --muted:#C6A79B;
+    --line:#55362C; --accent:#52B488; --accent-ink:#0E1A14; --accent-soft:#1D3328;
+    --sign:#E6B92A; --sign-ink:#221B05; --warn:#EE8A63; --warn-soft:#3A2219;
+    --blue:#7FA8E3; color-scheme:dark;
+  }}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 "Barlow",system-ui,sans-serif}
+  .wrap{max-width:1020px;margin:0 auto;padding:32px 20px 80px;display:flex;flex-direction:column;gap:22px}
+  h1,h2,h3{font-family:"Barlow Condensed","Arial Narrow",sans-serif;line-height:1.08;margin:0}
+  h1{font-size:clamp(36px,6vw,54px);font-weight:700}
+  h1 .u{background:var(--sign);color:var(--sign-ink);padding:0 .18em;border-radius:4px}
+  .eyebrow{font-family:"Barlow Condensed";font-weight:600;letter-spacing:.12em;text-transform:uppercase;font-size:13px;color:var(--muted)}
+  .lead{font-size:16px;max-width:70ch}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:22px 24px;display:flex;flex-direction:column;gap:12px}
+  .card h2{font-size:26px;font-weight:600}
+  .card > p{margin:0;max-width:78ch}
+  figure{margin:0;overflow-x:auto}
+  svg{display:block;min-width:720px;width:100%;height:auto;font-family:"Barlow",system-ui,sans-serif}
+  svg .box{fill:var(--sunk);stroke:var(--line);stroke-width:1.5;rx:8}
+  svg .hero{fill:var(--accent-soft);stroke:var(--accent)}
+  svg .gold{fill:color-mix(in srgb,var(--sign) 28%,var(--surface));stroke:var(--sign)}
+  svg .plain{fill:var(--surface)}
+  svg text{fill:var(--ink);font-size:13px}
+  svg .t{font-weight:600;font-size:14px}
+  svg .s{fill:var(--muted);font-size:11.5px}
+  svg .lbl{fill:var(--muted);font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase}
+  svg .edge{stroke:var(--muted);stroke-width:1.6;fill:none}
+  svg .edge.auth{stroke-dasharray:4 4}
+  svg .edge.ev{stroke:var(--accent)}
+  figcaption{font-size:13px;color:var(--muted);padding-top:8px}
+  table{border-collapse:collapse;font-size:14px;width:100%}
+  th{text-align:left;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);border-bottom:2px solid var(--ink);padding:8px 10px;white-space:nowrap}
+  td{border-bottom:1px solid var(--line);padding:8px 10px;vertical-align:top}
+  td:first-child{font-weight:600;white-space:nowrap}
+  code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.9em;background:var(--sunk);padding:1px 5px;border-radius:4px}
+  ol,ul{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:6px}
+  .cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:14px}
+  .mini{border:1px solid var(--line);border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:6px}
+  .mini h3{font-size:18px}
+  .mini p{margin:0;font-size:14px}
+  .note{border-left:4px solid var(--sign);background:var(--sunk);border-radius:0 8px 8px 0;padding:10px 14px;font-size:14px}
+  .toc{display:flex;flex-wrap:wrap;gap:6px}
+  .toc a{border:1px solid var(--line);background:var(--surface);border-radius:99px;padding:5px 12px;font-size:13px;text-decoration:none;color:var(--ink);font-weight:500}
+  .toc a:hover{border-color:var(--accent);color:var(--accent)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="eyebrow">Architecture guide</div>
+  <h1>How <span class="u">Berlin Calling</span> works</h1>
+</header>
+
+<p class="lead">
+  Two single-page apps, one API, six small backend services that each own their
+  own data, and an event bus that ties them together. Everything is serverless —
+  there is no machine to maintain, and at rest it costs almost nothing.
+</p>
+
+<nav class="toc">
+  <a href="#request">Request path</a><a href="#services">Service catalog</a>
+  <a href="#events">Event backbone</a><a href="#tracking">Interaction tracking</a>
+  <a href="#auth">Auth model</a><a href="#data">Data design</a>
+  <a href="#life">Life of a request</a><a href="#repo">Repo map</a>
+</nav>
+
+<!-- ===== Request path ===== -->
+<section class="card" id="request">
+  <h2>1 · The request path</h2>
+  <p>
+    Browsers load the static apps from CloudFront and call the API on the
+    <em>same domain</em> under <code>/api/*</code> — CloudFront forwards those to
+    API Gateway. Sign-in happens directly against Cognito; every API call then
+    carries a token that one of two authorizers checks before any service code runs.
+  </p>
+  <figure>
+  <svg viewBox="0 0 960 640" role="img" aria-label="Request path diagram">
+    <defs>
+      <marker id="arrA" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="var(--muted)"/>
+      </marker>
+    </defs>
+
+    <!-- users -->
+    <rect class="box plain" x="150" y="16" width="220" height="54" rx="8"/>
+    <text class="t" x="260" y="38" text-anchor="middle">Client (buyer)</text>
+    <text class="s" x="260" y="56" text-anchor="middle">browser · customer-web</text>
+    <rect class="box plain" x="590" y="16" width="220" height="54" rx="8"/>
+    <text class="t" x="700" y="38" text-anchor="middle">Admin (JJ)</text>
+    <text class="s" x="700" y="56" text-anchor="middle">browser · admin-web</text>
+
+    <!-- cognito pools -->
+    <rect class="box gold" x="16" y="130" width="196" height="76" rx="8"/>
+    <text class="t" x="114" y="152" text-anchor="middle">Cognito · customer pool</text>
+    <text class="s" x="114" y="170" text-anchor="middle">self-register or invited</text>
+    <text class="s" x="114" y="186" text-anchor="middle">email + password (SRP)</text>
+    <rect class="box gold" x="748" y="130" width="196" height="76" rx="8"/>
+    <text class="t" x="846" y="152" text-anchor="middle">Cognito · admin pool</text>
+    <text class="s" x="846" y="170" text-anchor="middle">invite-only · TOTP MFA</text>
+    <text class="s" x="846" y="186" text-anchor="middle">"admin" group claim</text>
+
+    <!-- cloudfront -->
+    <rect class="box" x="248" y="122" width="212" height="92" rx="8"/>
+    <text class="t" x="354" y="144" text-anchor="middle">CloudFront · www</text>
+    <text class="s" x="354" y="163" text-anchor="middle">static: S3 customer-web</text>
+    <text class="s" x="354" y="179" text-anchor="middle">/api/* → API Gateway</text>
+    <text class="s" x="354" y="197" text-anchor="middle">WAF (prod) · HTTPS</text>
+    <rect class="box" x="500" y="122" width="212" height="92" rx="8"/>
+    <text class="t" x="606" y="144" text-anchor="middle">CloudFront · admin</text>
+    <text class="s" x="606" y="163" text-anchor="middle">static: S3 admin-web</text>
+    <text class="s" x="606" y="179" text-anchor="middle">/api/* → API Gateway</text>
+    <text class="s" x="606" y="197" text-anchor="middle">WAF (prod) · HTTPS</text>
+
+    <!-- user arrows -->
+    <path class="edge" d="M260,70 L340,122" marker-end="url(#arrA)"/>
+    <path class="edge" d="M700,70 L620,122" marker-end="url(#arrA)"/>
+    <path class="edge auth" d="M190,70 L125,130" marker-end="url(#arrA)"/>
+    <text class="s" x="128" y="98">sign in</text>
+    <path class="edge auth" d="M770,70 L836,130" marker-end="url(#arrA)"/>
+    <text class="s" x="790" y="98">sign in</text>
+
+    <!-- api gateway -->
+    <rect class="box hero" x="200" y="272" width="560" height="104" rx="10"/>
+    <text class="t" x="480" y="296" text-anchor="middle">API Gateway · HTTP API · /api/v1</text>
+    <text class="s" x="340" y="320" text-anchor="middle">customer routes</text>
+    <text class="s" x="340" y="336" text-anchor="middle">Lambda authorizer: verifies token,</text>
+    <text class="s" x="340" y="351" text-anchor="middle">loads the caller's search memberships</text>
+    <text class="s" x="624" y="320" text-anchor="middle">admin routes (/admin/*)</text>
+    <text class="s" x="624" y="336" text-anchor="middle">JWT authorizer bound to the admin pool</text>
+    <text class="s" x="624" y="351" text-anchor="middle">+ "admin" group check</text>
+    <line x1="480" y1="306" x2="480" y2="362" stroke="var(--line)" stroke-width="1.5"/>
+
+    <path class="edge" d="M354,214 L400,272" marker-end="url(#arrA)"/>
+    <path class="edge" d="M606,214 L560,272" marker-end="url(#arrA)"/>
+    <path class="edge auth" d="M212,194 C260,250 280,270 300,290"/>
+    <text class="s" x="206" y="238">verify tokens</text>
+    <path class="edge auth" d="M748,194 C700,250 680,270 660,290"/>
+
+    <!-- services label -->
+    <text class="lbl" x="480" y="412" text-anchor="middle">one Lambda-backed service per business area, each with its own DynamoDB table</text>
+    <path class="edge" d="M480,376 L480,392" marker-end="url(#arrA)"/>
+
+    <!-- services row 1 -->
+    <g>
+      <rect class="box" x="16" y="428" width="296" height="80" rx="8"/>
+      <text class="t" x="164" y="450" text-anchor="middle">search</text>
+      <text class="s" x="164" y="468" text-anchor="middle">client searches · brief · settings</text>
+      <text class="s" x="164" y="483" text-anchor="middle">members &amp; invites · last-seen</text>
+      <text class="s" x="164" y="499" text-anchor="middle">⛁ search-table</text>
+
+      <rect class="box" x="332" y="428" width="296" height="80" rx="8"/>
+      <text class="t" x="480" y="450" text-anchor="middle">listings</text>
+      <text class="s" x="480" y="468" text-anchor="middle">pipeline · publish · benchmark · top-5</text>
+      <text class="s" x="480" y="483" text-anchor="middle">remodel · link inbox</text>
+      <text class="s" x="480" y="499" text-anchor="middle">⛁ listing-table</text>
+
+      <rect class="box" x="648" y="428" width="296" height="80" rx="8"/>
+      <text class="t" x="796" y="450" text-anchor="middle">media</text>
+      <text class="s" x="796" y="468" text-anchor="middle">photos &amp; floor plans · ordering</text>
+      <text class="s" x="796" y="483" text-anchor="middle">pre-signed S3 upload / download</text>
+      <text class="s" x="796" y="499" text-anchor="middle">⛁ media-table · 🪣 S3 bucket</text>
+    </g>
+    <!-- services row 2 -->
+    <g>
+      <rect class="box" x="16" y="528" width="296" height="80" rx="8"/>
+      <text class="t" x="164" y="550" text-anchor="middle">engagement</text>
+      <text class="s" x="164" y="568" text-anchor="middle">star ratings · threaded comments</text>
+      <text class="s" x="164" y="583" text-anchor="middle">moderation</text>
+      <text class="s" x="164" y="599" text-anchor="middle">⛁ engagement-table</text>
+
+      <rect class="box" x="332" y="528" width="296" height="80" rx="8"/>
+      <text class="t" x="480" y="550" text-anchor="middle">timesheet</text>
+      <text class="s" x="480" y="568" text-anchor="middle">hours ledger · paid tracking</text>
+      <text class="s" x="480" y="583" text-anchor="middle">live timer · pay-month</text>
+      <text class="s" x="480" y="599" text-anchor="middle">⛁ timesheet-table</text>
+
+      <rect class="box" x="648" y="528" width="296" height="80" rx="8"/>
+      <text class="t" x="796" y="550" text-anchor="middle">activity</text>
+      <text class="s" x="796" y="568" text-anchor="middle">audit log · activity feed</text>
+      <text class="s" x="796" y="583" text-anchor="middle">engagement rollups · client events</text>
+      <text class="s" x="796" y="599" text-anchor="middle">⛁ activity-table</text>
+    </g>
+  </svg>
+  <figcaption>
+    Solid arrows: HTTPS requests. Dashed: token issue/verify. The two Cognito
+    pools are fully separate — a customer token can never pass an admin route,
+    because the admin authorizer only trusts the admin pool's issuer.
+  </figcaption>
+  </figure>
+</section>
+
+<!-- ===== Service catalog ===== -->
+<section class="card" id="services">
+  <h2>2 · Service catalog</h2>
+  <p>Each service is independently deployable, owns its table exclusively, and never reads another service's data directly.</p>
+  <table>
+    <tr><th>Service</th><th>Client can…</th><th>Admin can…</th><th>Publishes events</th><th>Listens to</th></tr>
+    <tr><td>search</td><td>list "my searches", read search + brief (records last-seen)</td><td>CRUD searches, edit brief/settings, invite/remove members</td><td><code>search.*</code>, <code>member.*</code>, <code>client.signed_in</code></td><td>—</td></tr>
+    <tr><td>listings</td><td>read <b>published</b> listings (admin-private fields stripped)</td><td>full CRUD, publish/unpublish, status/contact/rank/remodel, bulk ops, inbox, viewings overview</td><td><code>listing.*</code> (with title/published payload)</td><td>—</td></tr>
+    <tr><td>media</td><td>gallery of published listings (signed URLs)</td><td>presign-upload-confirm flow, reorder, delete</td><td><code>photo.*</code></td><td><code>listing.published/unpublished/deleted</code></td></tr>
+    <tr><td>engagement</td><td>rate 1–5★ (clients), comment &amp; reply (all)</td><td>moderate ratings/comments, reply as JJ</td><td><code>rating.*</code>, <code>comment.*</code></td><td><code>listing.*</code> (identity/visibility guard)</td></tr>
+    <tr><td>timesheet</td><td>read the hours ledger</td><td>log hours, timer, mark paid / pay-month</td><td><code>hours.*</code></td><td>—</td></tr>
+    <tr><td>activity</td><td>send UI interaction events (batched)</td><td>query feed, audit log, per-listing engagement</td><td>—</td><td><b>everything</b> (<code>jj.*</code>)</td></tr>
+  </table>
+</section>
+
+<!-- ===== Event backbone ===== -->
+<section class="card" id="events">
+  <h2>3 · The event backbone</h2>
+  <p>
+    Writes publish a small event to one EventBridge bus. That's how services
+    cooperate without touching each other's tables: the activity service records
+    history, and media/engagement keep tiny event-carried copies of listing
+    state ("is it published? what's its title?") so they can make decisions locally.
+  </p>
+  <figure>
+  <svg viewBox="0 0 960 360" role="img" aria-label="Event flow diagram">
+    <defs>
+      <marker id="arrB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="var(--accent)"/>
+      </marker>
+    </defs>
+    <text class="lbl" x="130" y="18" text-anchor="middle">producers</text>
+    <text class="lbl" x="470" y="18" text-anchor="middle">bus</text>
+    <text class="lbl" x="810" y="18" text-anchor="middle">consumers</text>
+
+    <g>
+      <rect class="box plain" x="20" y="30"  width="220" height="46" rx="8"/><text class="t" x="130" y="51" text-anchor="middle">search</text><text class="s" x="130" y="67" text-anchor="middle">search.* · member.* · sign-ins</text>
+      <rect class="box plain" x="20" y="92"  width="220" height="46" rx="8"/><text class="t" x="130" y="113" text-anchor="middle">listings</text><text class="s" x="130" y="129" text-anchor="middle">listing.created/published/…</text>
+      <rect class="box plain" x="20" y="154" width="220" height="46" rx="8"/><text class="t" x="130" y="175" text-anchor="middle">media</text><text class="s" x="130" y="191" text-anchor="middle">photo.added / deleted</text>
+      <rect class="box plain" x="20" y="216" width="220" height="46" rx="8"/><text class="t" x="130" y="237" text-anchor="middle">engagement</text><text class="s" x="130" y="253" text-anchor="middle">rating.* · comment.*</text>
+      <rect class="box plain" x="20" y="278" width="220" height="46" rx="8"/><text class="t" x="130" y="299" text-anchor="middle">timesheet</text><text class="s" x="130" y="315" text-anchor="middle">hours.* · hours.paid</text>
+    </g>
+
+    <rect class="box hero" x="370" y="134" width="200" height="86" rx="10"/>
+    <text class="t" x="470" y="162" text-anchor="middle">EventBridge</text>
+    <text class="s" x="470" y="180" text-anchor="middle">bus: jj-events</text>
+    <text class="s" x="470" y="196" text-anchor="middle">+ admin.action on every</text>
+    <text class="s" x="470" y="210" text-anchor="middle">admin mutation (audit)</text>
+
+    <path class="edge ev" d="M240,53  C320,53 330,150 370,160" marker-end="url(#arrB)"/>
+    <path class="edge ev" d="M240,115 C310,115 320,160 370,168" marker-end="url(#arrB)"/>
+    <path class="edge ev" d="M240,177 L370,177" marker-end="url(#arrB)"/>
+    <path class="edge ev" d="M240,239 C310,239 320,195 370,187" marker-end="url(#arrB)"/>
+    <path class="edge ev" d="M240,301 C320,301 330,205 370,195" marker-end="url(#arrB)"/>
+
+    <rect class="box gold" x="690" y="36" width="250" height="104" rx="8"/>
+    <text class="t" x="815" y="58" text-anchor="middle">activity · event sink</text>
+    <text class="s" x="815" y="77" text-anchor="middle">admin.action → audit log (kept forever)</text>
+    <text class="s" x="815" y="93" text-anchor="middle">everything else → feed (180-day TTL)</text>
+    <text class="s" x="815" y="109" text-anchor="middle">retries ×2 → dead-letter queue → alarm</text>
+    <text class="s" x="815" y="127" text-anchor="middle">subscribes to all jj.* sources</text>
+
+    <rect class="box plain" x="690" y="162" width="250" height="74" rx="8"/>
+    <text class="t" x="815" y="184" text-anchor="middle">media · consumer</text>
+    <text class="s" x="815" y="202" text-anchor="middle">keeps "published" flag per listing;</text>
+    <text class="s" x="815" y="218" text-anchor="middle">deletes photos + S3 objects on listing delete</text>
+
+    <rect class="box plain" x="690" y="258" width="250" height="74" rx="8"/>
+    <text class="t" x="815" y="280" text-anchor="middle">engagement · consumer</text>
+    <text class="s" x="815" y="298" text-anchor="middle">keeps {searchId, title, published} per listing</text>
+    <text class="s" x="815" y="314" text-anchor="middle">→ blocks cross-tenant &amp; unpublished writes</text>
+
+    <path class="edge ev" d="M570,160 C630,140 640,100 690,90" marker-end="url(#arrB)"/>
+    <path class="edge ev" d="M570,182 C630,185 640,195 690,197" marker-end="url(#arrB)"/>
+    <path class="edge ev" d="M570,200 C630,220 640,280 690,290" marker-end="url(#arrB)"/>
+    <text class="s" x="612" y="110">all events</text>
+    <text class="s" x="600" y="233">listing.* only</text>
+  </svg>
+  <figcaption>
+    If a consumer is down or failing, EventBridge retries and then parks the
+    event in a dead-letter queue (and an alarm fires) — the audit trail cannot
+    silently lose events.
+  </figcaption>
+  </figure>
+</section>
+
+<!-- ===== Tracking ===== -->
+<section class="card" id="tracking">
+  <h2>4 · Client interaction tracking</h2>
+  <p>
+    The thing you asked for specifically: knowing what the client actually does
+    on the site. Two signal paths feed the same place.
+  </p>
+  <figure>
+  <svg viewBox="0 0 960 230" role="img" aria-label="Tracking data flow">
+    <defs>
+      <marker id="arrC" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="var(--muted)"/>
+      </marker>
+    </defs>
+    <rect class="box plain" x="16" y="30" width="210" height="88" rx="8"/>
+    <text class="t" x="121" y="52" text-anchor="middle">customer-web beacon</text>
+    <text class="s" x="121" y="71" text-anchor="middle">card expands · photo views</text>
+    <text class="s" x="121" y="86" text-anchor="middle">exposé/map clicks · tab views</text>
+    <text class="s" x="121" y="102" text-anchor="middle">batched every 15 s / 20 events</text>
+
+    <rect class="box plain" x="16" y="142" width="210" height="60" rx="8"/>
+    <text class="t" x="121" y="166" text-anchor="middle">domain events</text>
+    <text class="s" x="121" y="184" text-anchor="middle">ratings · comments · sign-ins</text>
+
+    <rect class="box hero" x="330" y="70" width="240" height="96" rx="10"/>
+    <text class="t" x="450" y="94" text-anchor="middle">activity service</text>
+    <text class="s" x="450" y="113" text-anchor="middle">feed records (180-day TTL)</text>
+    <text class="s" x="450" y="129" text-anchor="middle">per-listing counters (atomic ADD)</text>
+    <text class="s" x="450" y="145" text-anchor="middle">last-seen per member (search svc)</text>
+
+    <rect class="box gold" x="680" y="40" width="264" height="156" rx="8"/>
+    <text class="t" x="812" y="64" text-anchor="middle">admin-web</text>
+    <text class="s" x="812" y="86" text-anchor="middle">Dashboard: last activity · "quiet 7+ days"</text>
+    <text class="s" x="812" y="104" text-anchor="middle">Engagement: expands / photos / clicks</text>
+    <text class="s" x="812" y="120" text-anchor="middle">per listing + last viewed</text>
+    <text class="s" x="812" y="140" text-anchor="middle">Activity feed: "Brian rated ‘…’ 5★"</text>
+    <text class="s" x="812" y="158" text-anchor="middle">Audit: every admin change, forever</text>
+
+    <path class="edge" d="M226,74 C280,74 290,95 330,100" marker-end="url(#arrC)"/>
+    <text class="s" x="240" y="62">POST /activity/events</text>
+    <path class="edge" d="M226,172 C280,172 290,145 330,138" marker-end="url(#arrC)"/>
+    <text class="s" x="252" y="195">via the bus</text>
+    <path class="edge" d="M570,118 L680,118" marker-end="url(#arrC)"/>
+    <text class="s" x="596" y="108">admin queries</text>
+  </svg>
+  <figcaption>
+    First-party only, tied to the signed-in member, auto-expiring after 180
+    days. Tracking is fire-and-forget in the browser — if it fails, the app
+    never notices.
+  </figcaption>
+  </figure>
+</section>
+
+<!-- ===== Auth ===== -->
+<section class="card" id="auth">
+  <h2>5 · Who can do what</h2>
+  <div class="cols">
+    <div class="mini">
+      <h3>Client</h3>
+      <p>Signs in to the customer pool (self-registered or invited with a temp
+      password). Sees only searches they're a <b>member</b> of, and only
+      <b>published</b> listings with admin-private fields removed. Can rate,
+      comment, and view the hours ledger. Every request's memberships come from
+      the Lambda authorizer — handlers just compare.</p>
+    </div>
+    <div class="mini">
+      <h3>Viewer</h3>
+      <p>Same as client, except star ratings are blocked (they're nudged to
+      rate in a comment instead) — mirroring the original prototype's behavior.</p>
+    </div>
+    <div class="mini">
+      <h3>Admin</h3>
+      <p>Separate pool: no self-signup, strong password, <b>TOTP MFA required</b>,
+      must hold the <code>admin</code> group claim. Full control over every
+      search. Every mutation is written to the permanent audit log with
+      before/after snapshots.</p>
+    </div>
+  </div>
+  <div class="note">
+    Defense in depth for tenant isolation: (1) the authorizer only injects the
+    caller's own search memberships, (2) handlers check the requested search
+    against that map, (3) engagement/media verify listing↔search identity from
+    event-carried state before accepting writes.
+  </div>
+</section>
+
+<!-- ===== Data ===== -->
+<section class="card" id="data">
+  <h2>6 · Data design in one paragraph</h2>
+  <p>
+    Every table uses the same generic key pair (<code>PK</code>/<code>SK</code>)
+    with entity-prefixed values, so one table per service holds several record
+    types. A <b>search</b> is the tenancy unit: almost everything lives in a
+    <code>SEARCH#&lt;id&gt;</code> partition, which makes "load the whole board"
+    one query. IDs are ULIDs — lexicographically time-ordered, so "newest first"
+    is free.
+  </p>
+  <table>
+    <tr><th>Table</th><th>Partition examples</th><th>Special indexes / tricks</th></tr>
+    <tr><td>search</td><td><code>SEARCH#id → META, BRIEF, MEMBER#user</code></td><td>GSI by user → "my searches" (powers the authorizer); conditional update throttles last-seen to 1/15 min</td></tr>
+    <tr><td>listing</td><td><code>SEARCH#id → LISTING#id, SOURCE#id</code></td><td>sparse GSI containing only listings with a future viewing → cross-search viewings list</td></tr>
+    <tr><td>media</td><td><code>LISTING#id → PHOTO#id, META</code></td><td>GSI by search for the gallery; META carries the event-fed published flag</td></tr>
+    <tr><td>engagement</td><td><code>LISTING#id → RATING#user</code> · <code>SEARCH#id → COMMENT#id</code></td><td>GSI: all ratings per search; soft-deleted comments keep thread shape</td></tr>
+    <tr><td>timesheet</td><td><code>SEARCH#id → HOURS#id, TIMER</code></td><td>timer uses a conditional put — only one can run</td></tr>
+    <tr><td>activity</td><td><code>SEARCH#id → EVENT#time, ROLLUP#listing</code> · <code>AUDIT → time</code></td><td>TTL on feed rows only; GSIs by actor and global-recent; counters via atomic ADD</td></tr>
+  </table>
+</section>
+
+<!-- ===== Life of a request ===== -->
+<section class="card" id="life">
+  <h2>7 · Life of a request: Brian rates a listing ★★★★★</h2>
+  <ol>
+    <li>Brian clicks 5 stars → <code>PUT /api/v1/searches/S1/listings/L7/rating</code> with his customer-pool token.</li>
+    <li>CloudFront (www) forwards <code>/api/*</code> to API Gateway, same origin.</li>
+    <li>The <b>Lambda authorizer</b> verifies the token signature against the customer pool and queries the search table's membership index: Brian → <code>{S1: client}</code>. Cached 5 min.</li>
+    <li>The <b>engagement</b> handler validates the body with zod, checks Brian's role in S1 (clients may rate; viewers may not), and checks its local listing meta: L7 belongs to S1 <em>and</em> is published.</li>
+    <li>The rating is upserted (one per user per listing) and <code>rating.saved</code> — "Brian rated ‘Top-floor flat with roof terrace’ 5★" — goes onto the bus.</li>
+    <li>The <b>activity</b> sink writes it to S1's feed. Next time JJ opens the dashboard, it's right there; the engagement tab's counters already reflect Brian's earlier card-expands and photo views from the tracking beacon.</li>
+  </ol>
+  <p>Meanwhile JJ's own actions (publishing a listing, marking hours paid) follow the same path through the admin authorizer — and additionally land in the permanent audit log.</p>
+</section>
+
+<!-- ===== Repo map ===== -->
+<section class="card" id="repo">
+  <h2>8 · Where things live in the repo</h2>
+  <table>
+    <tr><th>Path</th><th>What it is</th></tr>
+    <tr><td><code>packages/shared</code></td><td>The contract everyone agrees on: zod schemas, Berlin district data, the all-in cost math (price × (1 + tax + notary + commission)), event types. Used by every service <em>and</em> both frontends.</td></tr>
+    <tr><td><code>packages/lambda-kit</code></td><td>Per-Lambda plumbing: request validation, auth context extraction, consistent error bodies, event publishing, logging.</td></tr>
+    <tr><td><code>services/*</code></td><td>One folder per service: <code>handlers/</code> (admin/customer/events entrypoints), <code>repo.ts</code> (DynamoDB), <code>domain.ts</code> (pure logic), <code>tests/</code> (unit + DynamoDB-backed integration).</td></tr>
+    <tr><td><code>apps/customer-web</code></td><td>The client site — the original prototype's CSS extracted verbatim, React components mirroring its behavior, Cognito auth, tracking beacon.</td></tr>
+    <tr><td><code>apps/admin-web</code></td><td>Admin console: dashboard, search/listing/hours management, engagement analytics, audit log.</td></tr>
+    <tr><td><code>infra</code></td><td>AWS CDK: 12 stacks (platform, auth, API, edge, frontends, one per service). <code>cdk.json</code> holds the dev/prod knobs (region, WAF, domains).</td></tr>
+    <tr><td><code>.github/workflows</code></td><td>CI (verify everything on each push/PR) and Deploy (dev → manual approval → prod).</td></tr>
+    <tr><td><code>docs/</code></td><td>This page and the AWS setup runbook.</td></tr>
+  </table>
+  <div class="note">
+    Rule of thumb when changing things: data shape → <code>packages/shared</code> first,
+    then the owning service, then the UIs. New endpoint → service handler + its CDK
+    stack route + <code>api/client.ts</code> in the app that calls it.
+  </div>
+</section>
+
+</div>
+</body>
+</html>
