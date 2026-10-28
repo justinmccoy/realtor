@@ -34,6 +34,14 @@ import {
   type ListingCreateInput
 } from "@jj/shared";
 
+interface SeedPhoto {
+  /** Index into the listings array. */
+  listingRef: number;
+  kind?: "photo" | "floorplan";
+  /** data: URL (data:image/jpeg;base64,…) or bare base64 (assumed JPEG). */
+  data: string;
+}
+
 interface SeedFile {
   search: { clientName: string; settings?: Record<string, number> };
   brief: Record<string, unknown>;
@@ -47,8 +55,28 @@ interface SeedFile {
     listingRef?: number;
     paid?: boolean;
   }[];
+  photos?: SeedPhoto[];
   ratings?: unknown[];
   comments?: unknown[];
+}
+
+function decodeImage(data: string): { bytes: Buffer; contentType: string } | null {
+  const m = data.match(/^data:(image\/(?:jpeg|png|webp));base64,(.+)$/s);
+  try {
+    if (m) return { contentType: m[1]!, bytes: Buffer.from(m[2]!, "base64") };
+    return { contentType: "image/jpeg", bytes: Buffer.from(data, "base64") };
+  } catch {
+    return null;
+  }
+}
+
+/** Every occurrence of --photos <file>; each file holds SeedPhoto[]. */
+function photoFiles(): string[] {
+  const files: string[] = [];
+  process.argv.forEach((a, i) => {
+    if (a === "--photos" && process.argv[i + 1]) files.push(process.argv[i + 1]!);
+  });
+  return files;
 }
 
 function arg(name: string, fallback?: string): string | undefined {
@@ -229,6 +257,56 @@ async function main(): Promise<void> {
     }
   }
   console.log(`Logged ${(seed.hours ?? []).length} hours entries.`);
+
+  /* ---------- photos (from the main file and/or --photos files) ---------- */
+  const photos: SeedPhoto[] = [
+    ...(seed.photos ?? []),
+    ...photoFiles().flatMap(
+      (file) => JSON.parse(readFileSync(file, "utf8")) as SeedPhoto[]
+    )
+  ];
+  if (photos.length) {
+    console.log(`Uploading ${photos.length} photo(s)…`);
+    let ok = 0;
+    const photoFailures: string[] = [];
+    for (const [i, p] of photos.entries()) {
+      const listingId = listingIds[p.listingRef];
+      const decoded = decodeImage(p.data);
+      if (!listingId || !decoded) {
+        photoFailures.push(
+          `  ✗ photo ${i + 1}: ${!listingId ? `no listing at ref ${p.listingRef}` : "undecodable image data"}`
+        );
+        continue;
+      }
+      try {
+        const presigned = await api<{
+          photoId: string;
+          uploadUrl: string;
+          headers: Record<string, string>;
+        }>(`/admin/searches/${search.id}/listings/${listingId}/photos/presign`, "POST", {
+          kind: p.kind ?? "photo",
+          contentType: decoded.contentType
+        });
+        const put = await fetch(presigned.uploadUrl, {
+          method: "PUT",
+          headers: presigned.headers,
+          body: new Uint8Array(decoded.bytes)
+        });
+        if (!put.ok) throw new Error(`S3 PUT failed (${put.status})`);
+        await api(
+          `/admin/searches/${search.id}/listings/${listingId}/photos/${presigned.photoId}/confirm`,
+          "POST"
+        );
+        ok++;
+      } catch (err) {
+        photoFailures.push(
+          `  ✗ photo ${i + 1} (listing ref ${p.listingRef}): ${err instanceof Error ? err.message : err}`
+        );
+      }
+    }
+    console.log(`Uploaded ${ok}/${photos.length} photos.`);
+    for (const line of photoFailures) console.error(line);
+  }
 
   const skipped = (seed.ratings?.length ?? 0) + (seed.comments?.length ?? 0);
   if (skipped) {
