@@ -36,28 +36,32 @@ export function Clients({
     setLoadError("");
     setPartial("");
     try {
-      // One failing search must not blank the whole page.
-      const settled = await Promise.allSettled(
-        searches.map(async (search) => {
-          const [detail, listings, ratings, comments] = await Promise.all([
-            api.searchDetail(search.id),
-            api.listings(search.id),
-            api.ratings(search.id),
-            api.comments(search.id)
-          ]);
-          return { search, detail, listings, ratings, comments };
-        })
-      );
+      // Sequential per search: new AWS accounts have low Lambda concurrency
+      // limits, and a parallel fan-out here gets throttled into 503s.
+      // One failing search still must not blank the whole page.
       const failed: string[] = [];
-      const perSearch = settled.flatMap((r, i) => {
-        if (r.status === "fulfilled") return [r.value];
-        failed.push(
-          `${searches[i]?.clientName ?? "?"}: ${
-            r.reason instanceof Error ? r.reason.message : String(r.reason)
-          }`
-        );
-        return [];
-      });
+      const perSearch: {
+        search: Search;
+        detail: Awaited<ReturnType<typeof api.searchDetail>>;
+        listings: Awaited<ReturnType<typeof api.listings>>;
+        ratings: Awaited<ReturnType<typeof api.ratings>>;
+        comments: Awaited<ReturnType<typeof api.comments>>;
+      }[] = [];
+      for (const search of searches) {
+        try {
+          const detail = await api.searchDetail(search.id);
+          const listings = await api.listings(search.id);
+          const ratings = await api.ratings(search.id);
+          const comments = await api.comments(search.id);
+          perSearch.push({ search, detail, listings, ratings, comments });
+        } catch (reason) {
+          failed.push(
+            `${search.clientName}: ${
+              reason instanceof Error ? reason.message : String(reason)
+            }`
+          );
+        }
+      }
       const cutoff = Date.now() - 30 * 86_400_000;
       const built: ClientRow[] = [];
       for (const { search, detail, listings, ratings, comments } of perSearch) {
