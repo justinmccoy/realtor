@@ -5,6 +5,7 @@ import { useAuth } from "./auth/AuthContext";
 import { Field, Modal, useToast } from "./components/ui";
 import { configOk } from "./config";
 import { Audit } from "./pages/Audit";
+import { Clients } from "./pages/Clients";
 import { Dashboard } from "./pages/Dashboard";
 import { Engagement } from "./pages/Engagement";
 import { Hours } from "./pages/Hours";
@@ -12,7 +13,14 @@ import { Listings } from "./pages/Listings";
 import { Login } from "./pages/Login";
 import { SearchOverview } from "./pages/SearchOverview";
 
-type Page = "dashboard" | "overview" | "listings" | "hours" | "engagement" | "audit";
+type Page =
+  | "dashboard"
+  | "clients"
+  | "overview"
+  | "listings"
+  | "hours"
+  | "engagement"
+  | "audit";
 
 export default function App() {
   const auth = useAuth();
@@ -116,6 +124,15 @@ export default function App() {
         >
           Dashboard
         </button>
+        <button
+          className="tab"
+          role="tab"
+          aria-selected={page === "clients"}
+          type="button"
+          onClick={() => setPage("clients")}
+        >
+          Clients
+        </button>
         {current &&
           perSearchPages.map((p) => (
             <button
@@ -148,6 +165,9 @@ export default function App() {
             setPage("overview");
           }}
         />
+      )}
+      {page === "clients" && (
+        <Clients searches={searches} onChanged={() => void loadSearches()} />
       )}
       {page === "overview" &&
         (detail ? (

@@ -1,13 +1,6 @@
 import { useState, type FormEvent } from "react";
-import {
-  DISTRICTS,
-  MEMBER_ROLES,
-  ORTSTEILE,
-  type Brief,
-  type MemberRole
-} from "@jj/shared";
+import { DISTRICTS, ORTSTEILE, type Brief } from "@jj/shared";
 import { api, type SearchDetail } from "../api/client";
-import { fmtWhen } from "../lib/format";
 import { linesOf, parseNum, toLines } from "../lib/parse";
 import { DangerButton, Field } from "../components/ui";
 
@@ -20,7 +13,7 @@ export function SearchOverview({
   onChanged: () => void;
   toast: (m: string) => void;
 }) {
-  const { search, brief, members } = detail;
+  const { search, brief } = detail;
 
   /* settings */
   const [clientName, setClientName] = useState(search.clientName);
@@ -75,30 +68,6 @@ export function SearchOverview({
     await api.putBrief(search.id, body);
     toast("Requirements saved");
     onChanged();
-  }
-
-  /* members */
-  const [invEmail, setInvEmail] = useState("");
-  const [invName, setInvName] = useState("");
-  const [invRole, setInvRole] = useState<MemberRole>("client");
-  const [invErr, setInvErr] = useState("");
-
-  async function invite(e: FormEvent) {
-    e.preventDefault();
-    setInvErr("");
-    try {
-      await api.invite(search.id, {
-        email: invEmail.trim(),
-        displayName: invName.trim(),
-        role: invRole
-      });
-      setInvEmail("");
-      setInvName("");
-      toast("Invitation sent — Cognito emails the temporary password");
-      onChanged();
-    } catch (err) {
-      setInvErr(err instanceof Error ? err.message : "Invite failed");
-    }
   }
 
   return (
@@ -279,85 +248,6 @@ export function SearchOverview({
         </div>
       </form>
 
-      <section className="panel">
-        <h2>Members</h2>
-        <form onSubmit={invite} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          <div className="three">
-            <Field label="Email">
-              <input
-                type="email"
-                value={invEmail}
-                onChange={(e) => setInvEmail(e.target.value)}
-                required
-              />
-            </Field>
-            <Field label="Name">
-              <input value={invName} onChange={(e) => setInvName(e.target.value)} required />
-            </Field>
-            <Field label="Role" hint="Viewers comment but can't save star ratings">
-              <select
-                className="inline"
-                value={invRole}
-                onChange={(e) => setInvRole(e.target.value as MemberRole)}
-              >
-                {MEMBER_ROLES.map((r) => (
-                  <option key={r} value={r}>
-                    {r}
-                  </option>
-                ))}
-              </select>
-            </Field>
-          </div>
-          {invErr && <p className="err">{invErr}</p>}
-          <div className="sheet-f">
-            <button className="btn primary" type="submit">
-              Invite
-            </button>
-          </div>
-        </form>
-        {members.length > 0 && (
-          <div className="tbl-wrap">
-            <table className="tbl">
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Email</th>
-                  <th>Role</th>
-                  <th>Last seen</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {members.map((m) => (
-                  <tr key={m.userId}>
-                    <td>{m.displayName}</td>
-                    <td>{m.email}</td>
-                    <td>{m.role}</td>
-                    <td className="muted">
-                      {m.lastSeenAt ? fmtWhen(m.lastSeenAt) : "never"}
-                    </td>
-                    <td>
-                      <div className="row-actions">
-                        <DangerButton
-                          label="Remove"
-                          onConfirm={() =>
-                            void api
-                              .removeMember(search.id, m.userId)
-                              .then(() => {
-                                toast("Member removed");
-                                onChanged();
-                              })
-                          }
-                        />
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
     </div>
   );
 }
