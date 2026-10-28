@@ -97,11 +97,19 @@ function toIsoOrNull(v: unknown): string | null {
   return Number.isNaN(d.getTime()) ? null : d.toISOString();
 }
 
+const LISTING_STATUSES = ["new", "short", "viewing", "viewed", "offer", "passed"];
+const CONTACT_STATUSES = [
+  "none", "contacted", "requested", "confirmed", "viewed", "noreply", "declined"
+];
+
 function normalizeListing(raw: Record<string, unknown>): Record<string, unknown> {
   const balcony = raw.balcony === "yes" || raw.balcony === "no" ? raw.balcony : "unknown";
   const remodel = raw.remodel as Record<string, unknown> | null | undefined;
   return {
     ...raw,
+    // The prototype left these null/absent until first touched.
+    status: LISTING_STATUSES.includes(raw.status as string) ? raw.status : "new",
+    contact: CONTACT_STATUSES.includes(raw.contact as string) ? raw.contact : "none",
     url: typeof raw.url === "string" && /^https?:/.test(raw.url) ? raw.url : null,
     ortsteil: raw.ortsteil || null,
     kiez: raw.kiez || null,
