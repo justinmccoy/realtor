@@ -158,17 +158,49 @@ async function main(): Promise<void> {
   const brief: Brief = briefSchema.parse(seed.brief);
   await api(`/admin/searches/${search.id}/brief`, "PUT", brief);
 
-  console.log(`Creating ${seed.listings.length} listings…`);
+  // Validate every listing up front so one bad field can't half-seed the board.
+  const parsed: { index: number; body: ListingCreateInput }[] = [];
+  const invalid: string[] = [];
+  seed.listings.forEach((raw, index) => {
+    const result = listingCreateSchema.safeParse(raw);
+    if (result.success) {
+      parsed.push({ index, body: result.data });
+    } else {
+      const title = (raw as { title?: string }).title ?? `#${index + 1}`;
+      const issues = result.error.issues
+        .map((i) => `${i.path.join(".")}: ${i.message}`)
+        .join("; ");
+      invalid.push(`  ✗ listing ${index + 1} "${title}" — ${issues}`);
+    }
+  });
+  if (invalid.length) {
+    console.error(`\n${invalid.length} listing(s) failed validation:`);
+    for (const line of invalid) console.error(line);
+    console.error("Fix the seed file and re-run. Nothing was created.\n");
+    process.exit(1);
+  }
+
+  console.log(`Creating ${parsed.length} listings…`);
   const listingIds: string[] = [];
-  for (const raw of seed.listings) {
-    const body: ListingCreateInput = listingCreateSchema.parse(raw);
-    const created = await api<{ id: string; title: string }>(
-      `/admin/searches/${search.id}/listings`,
-      "POST",
-      body
-    );
-    listingIds.push(created.id);
-    console.log(`  · ${created.title}`);
+  const failed: string[] = [];
+  for (const { index, body } of parsed) {
+    try {
+      const created = await api<{ id: string; title: string }>(
+        `/admin/searches/${search.id}/listings`,
+        "POST",
+        body
+      );
+      listingIds[index] = created.id;
+      console.log(`  · ${created.title}`);
+    } catch (err) {
+      failed.push(
+        `  ✗ "${body.title}" — ${err instanceof Error ? err.message : err}`
+      );
+    }
+  }
+  if (failed.length) {
+    console.error(`\n${failed.length} listing(s) failed to create:`);
+    for (const line of failed) console.error(line);
   }
 
   if (seed.sources?.length) {

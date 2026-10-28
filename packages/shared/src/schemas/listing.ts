@@ -46,7 +46,8 @@ const listingFields = {
   beds: z.number().int().min(0).max(20).nullable().default(null),
   baths: z.number().positive().max(10).nullable().default(null),
   floor: z.string().max(50).nullable().default(null),
-  year: z.string().max(20).nullable().default(null),
+  /** Freeform display text, e.g. "1908, roof storey 2014". */
+  year: z.string().max(40).nullable().default(null),
   /** Service charge (Hausgeld) €/month. */
   hausgeld: z.number().min(0).max(100_000).nullable().default(null),
   /** Buyer's commission % — null means "use the search default". */
