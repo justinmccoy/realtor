@@ -43,7 +43,23 @@ export function Login() {
       if (result.kind !== "signedIn") setPending(result);
       setCode("");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Sign-in failed");
+      const message = e instanceof Error ? e.message : "Sign-in failed";
+      // Cognito challenge sessions expire after ~3 minutes. Restart cleanly:
+      // a retry against the dead session can never succeed, and each sign-in
+      // issues a fresh TOTP secret anyway.
+      if (/session is expired|invalid session/i.test(message)) {
+        setPending({ kind: "none" });
+        setPassword("");
+        setCode("");
+        setError(
+          "That took longer than Cognito's 3-minute window — sign in again. " +
+            "Tip: have your authenticator app open and ready first. If you " +
+            "already added an entry for this site, delete it; a fresh secret " +
+            "is issued each attempt."
+        );
+      } else {
+        setError(message);
+      }
     } finally {
       setBusy(false);
     }
