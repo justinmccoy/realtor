@@ -1,6 +1,23 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import QRCode from "qrcode";
 import { useAuth } from "../auth/AuthContext";
 import * as cognito from "../auth/cognito";
+
+function TotpQr({ value }: { value: string }) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    if (ref.current) {
+      void QRCode.toCanvas(ref.current, value, { width: 200, margin: 2 });
+    }
+  }, [value]);
+  return (
+    <canvas
+      ref={ref}
+      style={{ borderRadius: 8, alignSelf: "center", maxWidth: "100%" }}
+      aria-label="Scan this QR code with your authenticator app"
+    />
+  );
+}
 
 type Pending =
   | { kind: "none" }
@@ -94,11 +111,16 @@ export function Login() {
           {pending.kind === "mfaSetup" && (
             <>
               <p className="note-line" style={{ margin: 0 }}>
-                Add this account to your authenticator app (scan a QR from the
-                otpauth URL or paste the secret), then enter the 6-digit code.
+                Scan this QR code with your authenticator app (or enter the
+                setup key below manually), then type the 6-digit code it shows.
               </p>
-              <div className="secret">{pending.secret}</div>
-              <div className="secret">{pending.otpauthUrl}</div>
+              <TotpQr value={pending.otpauthUrl} />
+              <details>
+                <summary className="note-line" style={{ cursor: "pointer" }}>
+                  Can't scan? Show the setup key
+                </summary>
+                <div className="secret">{pending.secret}</div>
+              </details>
               <div className="field">
                 <label>Code from your authenticator</label>
                 <input
