@@ -42,7 +42,13 @@ export default function App() {
       return;
     }
     localStorage.setItem("jj-admin-search", searchId);
-    setDetail(await api.searchDetail(searchId));
+    try {
+      setDetail(await api.searchDetail(searchId));
+    } catch {
+      // Search was deleted (or access changed): fall back until the search
+      // list refresh picks a valid one.
+      setDetail(null);
+    }
   }, [searchId]);
 
   useEffect(() => {
@@ -145,7 +151,11 @@ export default function App() {
       )}
       {page === "overview" &&
         (detail ? (
-          <SearchOverview detail={detail} onChanged={() => void loadDetail().then(loadSearches)} toast={toast} />
+          <SearchOverview
+            detail={detail}
+            onChanged={() => void loadSearches().then(() => loadDetail())}
+            toast={toast}
+          />
         ) : (
           <div className="loading">Pick or create a search.</div>
         ))}

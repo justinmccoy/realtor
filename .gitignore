@@ -10,3 +10,5 @@ coverage/
 *.tsbuildinfo
 .turbo/
 seed/private-*.json
+seed/photos-*.json
+seed/*-export.json

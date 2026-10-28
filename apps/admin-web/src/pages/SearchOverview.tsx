@@ -145,6 +145,17 @@ export function SearchOverview({
           </Field>
         </div>
         <div className="sheet-f">
+          {search.status === "archived" && (
+            <DangerButton
+              label="Delete search permanently"
+              onConfirm={() =>
+                void api.deleteSearch(search.id).then(() => {
+                  toast("Search deleted");
+                  onChanged();
+                })
+              }
+            />
+          )}
           <button className="btn primary" type="submit">
             Save settings
           </button>
