@@ -1,0 +1,95 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  id-token: write # GitHub OIDC → AWS role
+  contents: read
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      dynamodb:
+        image: amazon/dynamodb-local:latest
+        ports:
+          - 8000:8000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm -r typecheck
+      - run: pnpm -r test
+      - run: pnpm -r --if-present run test:integration
+        env:
+          DDB_ENDPOINT: http://localhost:8000
+
+  deploy-dev:
+    needs: verify
+    runs-on: ubuntu-latest
+    environment:
+      name: dev
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: eu-central-1
+      - name: Deploy infrastructure (dev)
+        run: pnpm --filter @jj/infra exec cdk deploy -c env=dev --all --require-approval never
+      - name: Data migrations
+        # DynamoDB is schemaless — services ship versioned migration scripts
+        # here if/when a data shape changes. No-op today.
+        run: pnpm -r --if-present run migrate
+      - name: Build & publish frontends (dev)
+        run: ./scripts/deploy-frontends.sh dev
+
+  deploy-prod:
+    needs: deploy-dev
+    runs-on: ubuntu-latest
+    # Configure "production" in GitHub → Settings → Environments with required
+    # reviewers: that makes this job the manual approval gate.
+    environment:
+      name: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: eu-central-1
+      - name: Deploy infrastructure (prod)
+        run: pnpm --filter @jj/infra exec cdk deploy -c env=prod --all --require-approval never
+      - name: Data migrations
+        run: pnpm -r --if-present run migrate
+      - name: Build & publish frontends (prod)
+        run: ./scripts/deploy-frontends.sh prod

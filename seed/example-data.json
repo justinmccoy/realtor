@@ -1,0 +1,398 @@
+{
+  "_comment": "Example content matching the original prototype's structure. To use real data instead: export the prototype's data store (listings, hours, brief, settings, ratings) as JSON in this shape, save it as seed/private-export.json, and run the seed script with --from that file.",
+  "search": {
+    "clientName": "Brian",
+    "settings": {
+      "rate": 45,
+      "gre": 6,
+      "notary": 2,
+      "provision": 3.57,
+      "budget": 750000
+    }
+  },
+  "brief": {
+    "budget": 750000,
+    "minSqm": 70,
+    "minBeds": 2,
+    "districts": ["Friedrichshain-Kreuzberg"],
+    "ortsteile": ["Prenzlauer Berg", "Neukölln", "Schöneberg", "Moabit"],
+    "timeline": "Buy by spring 2027",
+    "must": [
+      "Balcony",
+      "Lift or max. 3rd floor",
+      "Quiet street or courtyard-facing bedroom"
+    ],
+    "nice": ["Altbau with stucco", "Near a park", "Guest WC", "Cellar room"],
+    "no": ["Ground floor", "Sitting tenant", "Erbbaurecht (leasehold)"],
+    "notes": "Financing pre-approved up to €600k loan; Brian and partner will live there themselves. Home office needs one quiet room."
+  },
+  "listings": [
+    {
+      "title": "Bright Altbau with balcony",
+      "url": "https://www.immobilienscout24.de/expose/example-1",
+      "benchmark": true,
+      "published": true,
+      "bezirk": "Friedrichshain-Kreuzberg",
+      "ortsteil": "Kreuzberg",
+      "kiez": "Bergmannkiez, Zossener Str.",
+      "price": 489000,
+      "sqm": 78,
+      "rooms": 3,
+      "beds": 2,
+      "baths": 1,
+      "floor": "3rd floor",
+      "year": "1905",
+      "hausgeld": 340,
+      "provision": 3.57,
+      "balcony": "yes",
+      "balconyNote": "South-west, approx. 6 m²",
+      "status": "viewed",
+      "viewingAt": "2026-10-10T11:00:00+02:00",
+      "contact": "viewed",
+      "vComment": "Great light all afternoon. Stairwell freshly renovated. Street side is noisier than expected — bedroom faces the courtyard though.",
+      "jjNotes": "Agent: Frau Keller (ImmoScout message). Hausgeld statement and the last two WEG protocols requested 11 Oct.",
+      "jjComments": "The reference point for this search: solid Altbau, fair €/m² for Bergmannkiez. Everything else gets measured against this one.",
+      "pros": [
+        "Classic Altbau, 3.4 m ceilings and stucco",
+        "South-west balcony onto the courtyard",
+        "Bergmannkiez location, Marheineke market hall 3 min"
+      ],
+      "cons": [
+        "Kitchen is 20 years old",
+        "No lift (3rd floor is the agreed maximum)",
+        "Gas floor heating (etagenheizung) — replacement due in a few years"
+      ],
+      "notes": "WEG reserve fund looks healthy at first glance (€48k). Confirm no special assessments planned.",
+      "remodel": {
+        "none": false,
+        "items": ["Kitchen", "Cosmetic (paint, walls)"],
+        "cost": 25000,
+        "comment": "New kitchen plus repaint throughout; nothing structural."
+      },
+      "topRank": 2
+    },
+    {
+      "title": "Top-floor flat with roof terrace",
+      "url": "https://www.immobilienscout24.de/expose/example-2",
+      "benchmark": false,
+      "published": true,
+      "bezirk": "Pankow",
+      "ortsteil": "Prenzlauer Berg",
+      "kiez": "Helmholtzkiez, Dunckerstr.",
+      "price": 645000,
+      "sqm": 82,
+      "rooms": 3,
+      "beds": 2,
+      "baths": 1,
+      "floor": "5th floor (top), lift",
+      "year": "1908, roof storey 2014",
+      "hausgeld": 410,
+      "provision": 3.57,
+      "balcony": "yes",
+      "balconyNote": "Roof terrace approx. 14 m², west",
+      "status": "offer",
+      "viewingAt": "2026-10-17T15:30:00+02:00",
+      "contact": "viewed",
+      "vComment": "Stunning evening light on the terrace. Finishes from the 2014 conversion still look fresh. Some creaking in the dormer windows during wind.",
+      "jjNotes": "Offer of €620k submitted 21 Oct via notary draft. Seller's agent hints at a second bidder — do not chase above €635k.",
+      "jjComments": "My #1. The terrace is a once-a-year find at this price, the 2014 roof conversion means no renovation risk, and Helmholtzkiez matches everything you said about cafés + the park.",
+      "pros": [
+        "14 m² west-facing roof terrace",
+        "Lift directly to the floor",
+        "Fully renovated 2014, new electrics and windows"
+      ],
+      "cons": [
+        "Highest €/m² on the board",
+        "Hausgeld on the high side (lift, roof reserve)",
+        "Second bidder in play"
+      ],
+      "notes": "All-in lands just under budget at asking; at €620k there is comfortable headroom.",
+      "remodel": {
+        "none": true,
+        "items": [],
+        "cost": null,
+        "comment": ""
+      },
+      "topRank": 1
+    },
+    {
+      "title": "Garden-house Altbau, quiet courtyard",
+      "url": "https://www.kleinanzeigen.de/s-anzeige/example-3",
+      "benchmark": false,
+      "published": true,
+      "bezirk": "Neukölln",
+      "ortsteil": "Neukölln",
+      "kiez": "Reuterkiez, Hobrechtstr.",
+      "price": 419000,
+      "sqm": 68,
+      "rooms": 2.5,
+      "beds": 2,
+      "baths": 1,
+      "floor": "2nd floor, garden house",
+      "year": "1900",
+      "hausgeld": 265,
+      "provision": 0,
+      "balcony": "no",
+      "balconyNote": null,
+      "status": "short",
+      "viewingAt": null,
+      "contact": "requested",
+      "vComment": "",
+      "jjNotes": "Private sale, commission-free. Owner replies slowly — viewing requested for first week of November.",
+      "jjComments": "Cheapest €/m² on the list and commission-free, but it misses two of your must-haves (no balcony, 68 m²). Worth one viewing to calibrate the bottom of the market.",
+      "pros": [
+        "Commission-free — saves ~€15k",
+        "Dead-quiet garden house off the street",
+        "Reuterkiez, canal 4 min on foot"
+      ],
+      "cons": [
+        "No balcony (must-have miss)",
+        "68 m² is under the 70 m² minimum",
+        "Bathroom has no window"
+      ],
+      "notes": "",
+      "remodel": {
+        "none": false,
+        "items": ["Bathroom", "Floors"],
+        "cost": 18000,
+        "comment": "Bathroom redo and floor sanding; kitchen is recent."
+      },
+      "topRank": 0
+    },
+    {
+      "title": "Renovated Altbau near Boxhagener Platz",
+      "url": "https://www.immowelt.de/expose/example-4",
+      "benchmark": false,
+      "published": true,
+      "bezirk": "Friedrichshain-Kreuzberg",
+      "ortsteil": "Friedrichshain",
+      "kiez": "Boxhagener Kiez, Krossener Str.",
+      "price": 598000,
+      "sqm": 75,
+      "rooms": 3,
+      "beds": 2,
+      "baths": 1.5,
+      "floor": "4th floor, lift",
+      "year": "1902, renovated 2021",
+      "hausgeld": 385,
+      "provision": 3.57,
+      "balcony": "yes",
+      "balconyNote": "French balcony + small loggia, east",
+      "status": "viewing",
+      "viewingAt": "2026-11-03T17:00:00+01:00",
+      "contact": "confirmed",
+      "vComment": "",
+      "jjNotes": "Viewing confirmed 3 Nov 17:00 with Herr Brandt (Immowelt). Ask about the 2021 renovation scope — plumbing risers included or not?",
+      "jjComments": "Strong all-rounder: lift, guest WC, 2021 renovation. The loggia is small — go to the viewing with terrace expectations dialled down.",
+      "pros": [
+        "Lift + guest WC (rare combination here)",
+        "2021 renovation, new electrics",
+        "Boxhagener Platz market on Saturdays"
+      ],
+      "cons": [
+        "Loggia is barely 3 m²",
+        "East light only in the mornings",
+        "Weekend noise from Simon-Dach-Str. nightlife two blocks away"
+      ],
+      "notes": "",
+      "remodel": null,
+      "topRank": 3
+    },
+    {
+      "title": "Schöneberg classic by Akazienstraße",
+      "url": "https://www.engelvoelkers.com/expose/example-5",
+      "benchmark": false,
+      "published": true,
+      "bezirk": "Tempelhof-Schöneberg",
+      "ortsteil": "Schöneberg",
+      "kiez": "Akazienkiez, Belziger Str.",
+      "price": 535000,
+      "sqm": 80,
+      "rooms": 3,
+      "beds": 2,
+      "baths": 1,
+      "floor": "1st floor",
+      "year": "1897",
+      "hausgeld": 310,
+      "provision": 3.57,
+      "balcony": "yes",
+      "balconyNote": "Balcony to the quiet side street, south",
+      "status": "new",
+      "viewingAt": null,
+      "contact": "contacted",
+      "vComment": "",
+      "jjNotes": "E&V agent contacted 24 Oct; exposé PDF received, floor plan attached to the listing.",
+      "jjComments": "Just came in. On paper it ticks every must-have and Akazienkiez is the most 'village' of your areas. First floor means checking street noise carefully.",
+      "pros": [
+        "All three must-haves met on paper",
+        "Akazienstraße cafés and shops around the corner",
+        "Original 1897 details, double doors, herringbone parquet"
+      ],
+      "cons": [
+        "1st floor — some street view into the flat",
+        "Energy class E, old windows on the street side"
+      ],
+      "notes": "",
+      "remodel": null,
+      "topRank": 0
+    },
+    {
+      "title": "Wedding up-and-comer with balcony",
+      "url": "https://www.immobilienscout24.de/expose/example-6",
+      "benchmark": false,
+      "published": false,
+      "bezirk": "Mitte",
+      "ortsteil": "Wedding",
+      "kiez": "Sprengelkiez, Tegeler Str.",
+      "price": 365000,
+      "sqm": 64,
+      "rooms": 2,
+      "beds": 1,
+      "baths": 1,
+      "floor": "2nd floor",
+      "year": "1910",
+      "hausgeld": 240,
+      "provision": 3.57,
+      "balcony": "yes",
+      "balconyNote": "West, approx. 4 m²",
+      "status": "new",
+      "viewingAt": null,
+      "contact": "none",
+      "vComment": "",
+      "jjNotes": "Under both minimums (64 m², 1 bedroom) — holding unpublished unless Brian wants a price anchor in Wedding.",
+      "jjComments": "",
+      "pros": ["Lowest absolute price", "Sprengelkiez canal-side location"],
+      "cons": ["1 bedroom only", "Under the size minimum"],
+      "notes": "",
+      "remodel": null,
+      "topRank": 0
+    },
+    {
+      "title": "Spacious Charlottenburg classic",
+      "url": "https://www.immobilienscout24.de/expose/example-7",
+      "benchmark": false,
+      "published": true,
+      "bezirk": "Charlottenburg-Wilmersdorf",
+      "ortsteil": "Charlottenburg",
+      "kiez": "Near Lietzensee, Witzlebenstr.",
+      "price": 729000,
+      "sqm": 96,
+      "rooms": 3.5,
+      "beds": 3,
+      "baths": 2,
+      "floor": "2nd floor, lift",
+      "year": "1911",
+      "hausgeld": 450,
+      "provision": 3.57,
+      "balcony": "yes",
+      "balconyNote": "Loggia to the courtyard",
+      "status": "passed",
+      "viewingAt": "2026-09-28T10:00:00+02:00",
+      "contact": "viewed",
+      "vComment": "Beautiful flat, genuinely spacious — but the numbers don't work. All-in lands ~€63k over budget before any work.",
+      "jjNotes": "Passed 1 Oct. Keep the agent contact — she gets Lietzensee stock early.",
+      "jjComments": "Passed on budget, not on quality. If the budget ever moves to €820k, this is the standard to beat.",
+      "pros": [
+        "96 m², three real bedrooms",
+        "Lietzensee park at the door",
+        "Two bathrooms"
+      ],
+      "cons": ["All-in ≈ €813k — over budget", "West Berlin commute to Brian's office"],
+      "notes": "",
+      "remodel": null,
+      "topRank": 0
+    },
+    {
+      "title": "Rummelsburg waterside Neubau",
+      "url": "https://www.immobilienscout24.de/expose/example-8",
+      "benchmark": false,
+      "published": true,
+      "bezirk": "Lichtenberg",
+      "ortsteil": "Rummelsburg",
+      "kiez": "Rummelsburger Bucht, Hauptstr.",
+      "price": 445000,
+      "sqm": 71,
+      "rooms": 3,
+      "beds": 2,
+      "baths": 1,
+      "floor": "3rd floor, lift",
+      "year": "2019",
+      "hausgeld": 295,
+      "provision": 2.38,
+      "balcony": "yes",
+      "balconyNote": "South-east, 7 m², water view at an angle",
+      "status": "short",
+      "viewingAt": null,
+      "contact": "contacted",
+      "vComment": "",
+      "jjNotes": "Reduced commission (2.38%). Developer resale, KfW-55 building.",
+      "jjComments": "The rational choice: nothing to renovate, low running costs, lift, and the bay on your doorstep. Less charm than the Altbauten — view it after one of them for the contrast.",
+      "pros": [
+        "2019 build — zero renovation, KfW-55 energy",
+        "Lift, underground parking optional",
+        "Rummelsburger Bucht water 2 min"
+      ],
+      "cons": [
+        "Neubau character — no stucco, lower ceilings",
+        "S-Bahn ride to most of your target kieze"
+      ],
+      "notes": "",
+      "remodel": {
+        "none": true,
+        "items": [],
+        "cost": null,
+        "comment": ""
+      },
+      "topRank": 0
+    }
+  ],
+  "sources": [
+    {
+      "url": "https://www.immobilienscout24.de/expose/example-inbox-1",
+      "status": "pending"
+    },
+    {
+      "url": "https://www.kleinanzeigen.de/s-anzeige/example-inbox-2",
+      "status": "pending"
+    }
+  ],
+  "hours": [
+    { "date": "2026-09-22", "minutes": 150, "category": "Research", "note": "Initial market scan, 40 exposés filtered to 9 candidates", "paid": true },
+    { "date": "2026-09-25", "minutes": 45, "category": "Calls & email", "note": "First contact with five agents", "paid": true },
+    { "date": "2026-09-28", "minutes": 105, "category": "Viewing", "note": "Charlottenburg viewing incl. travel", "listingRef": 6, "paid": true },
+    { "date": "2026-09-28", "minutes": 30, "category": "Paperwork", "note": "Charlottenburg: WEG protocol review", "listingRef": 6, "paid": true },
+    { "date": "2026-10-06", "minutes": 60, "category": "Research", "note": "Helmholtzkiez comparables for the terrace flat", "listingRef": 1, "paid": false },
+    { "date": "2026-10-10", "minutes": 90, "category": "Viewing", "note": "Bergmannkiez viewing", "listingRef": 0, "paid": false },
+    { "date": "2026-10-11", "minutes": 40, "category": "Paperwork", "note": "Requested Hausgeld statements + WEG protocols (Bergmannkiez)", "listingRef": 0, "paid": false },
+    { "date": "2026-10-17", "minutes": 95, "category": "Viewing", "note": "Roof terrace viewing incl. travel", "listingRef": 1, "paid": false },
+    { "date": "2026-10-21", "minutes": 75, "category": "Paperwork", "note": "Offer preparation and notary draft for Dunckerstr.", "listingRef": 1, "paid": false },
+    { "date": "2026-10-24", "minutes": 35, "category": "Calls & email", "note": "E&V exposé follow-up, Schöneberg", "listingRef": 4, "paid": false }
+  ],
+  "ratings": [
+    {
+      "listingRef": 0,
+      "score": 4,
+      "comment": "Loved the light and the kiez. Kitchen budget needed but fine."
+    },
+    {
+      "listingRef": 1,
+      "score": 5,
+      "comment": "The terrace sold me. Let's push on the offer."
+    },
+    {
+      "listingRef": 6,
+      "score": 3,
+      "comment": "Gorgeous but I can't make the numbers work either."
+    }
+  ],
+  "comments": [
+    {
+      "listingRef": 1,
+      "body": "If the second bidder goes above €635k I'd rather lose it than stretch — agreed?"
+    },
+    {
+      "listingRef": null,
+      "body": "General note: after seeing four Altbauten I care more about the quiet bedroom than about stucco."
+    }
+  ]
+}

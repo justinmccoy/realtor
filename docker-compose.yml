@@ -1,0 +1,17 @@
+# Local development dependencies.
+#   docker compose up -d
+# DynamoDB Local backs integration tests and local service runs;
+# LocalStack provides S3 + EventBridge for the media/activity services.
+services:
+  dynamodb:
+    image: amazon/dynamodb-local:latest
+    command: "-jar DynamoDBLocal.jar -sharedDb -inMemory"
+    ports:
+      - "8000:8000"
+
+  localstack:
+    image: localstack/localstack:3
+    environment:
+      - SERVICES=s3,events
+    ports:
+      - "4566:4566"

@@ -1,0 +1,135 @@
+@import "./artifact.css";
+
+/* App-only additions on top of the artifact styles. */
+:root {
+  color-scheme: light dark;
+}
+body {
+  margin: 0;
+}
+img {
+  max-width: 100%;
+}
+
+/* auth screens */
+.auth-wrap {
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+}
+.auth-card {
+  width: 100%;
+  max-width: 400px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.auth-card form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.auth-switch {
+  font-size: 14px;
+  color: var(--muted);
+}
+.auth-switch button {
+  all: unset;
+  cursor: pointer;
+  color: var(--accent);
+  font-weight: 600;
+}
+.auth-switch button:hover {
+  text-decoration: underline;
+}
+
+/* comments */
+.cmt-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.cmt {
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+  font-size: 14px;
+}
+.cmt .who {
+  font-weight: 600;
+}
+.cmt .who .role {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-radius: 4px;
+  padding: 1px 6px;
+  margin-left: 6px;
+}
+.cmt .when {
+  color: var(--muted);
+  font-size: 12px;
+  margin-left: 8px;
+}
+.cmt p {
+  margin: 4px 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.cmt.reply {
+  margin-left: 22px;
+  border-left: 3px solid var(--line);
+  padding-left: 10px;
+  border-top: 0;
+}
+.cmt .deleted {
+  color: var(--muted);
+  font-style: italic;
+}
+.cmt-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.cmt-form textarea {
+  border: 1px solid var(--line);
+  background: var(--bg);
+  border-radius: 7px;
+  padding: 8px 10px;
+  min-height: 56px;
+  resize: vertical;
+  width: 100%;
+}
+.cmt-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  align-items: center;
+}
+.replying {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* search picker + header extras */
+.picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.loading,
+.fatal {
+  padding: 48px 20px;
+  text-align: center;
+  color: var(--muted);
+}
+.fatal {
+  color: var(--warn);
+}

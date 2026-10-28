@@ -1,0 +1,12 @@
+node_modules/
+dist/
+cdk.out/
+coverage/
+*.local
+.env
+.env.*
+!.env.example
+.DS_Store
+*.tsbuildinfo
+.turbo/
+seed/private-*.json

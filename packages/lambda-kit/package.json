@@ -1,0 +1,29 @@
+{
+  "name": "@jj/lambda-kit",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@aws-lambda-powertools/logger": "^2.12.0",
+    "@aws-sdk/client-dynamodb": "^3.700.0",
+    "@aws-sdk/client-eventbridge": "^3.700.0",
+    "@aws-sdk/lib-dynamodb": "^3.700.0",
+    "@jj/shared": "workspace:*",
+    "ulid": "^2.3.0",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.146",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}

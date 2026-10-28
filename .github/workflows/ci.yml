@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      dynamodb:
+        image: amazon/dynamodb-local:latest
+        ports:
+          - 8000:8000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm -r typecheck
+      - name: Unit tests
+        run: pnpm -r test
+      - name: Integration tests (DynamoDB Local)
+        run: pnpm -r --if-present run test:integration
+        env:
+          DDB_ENDPOINT: http://localhost:8000
+      - name: Build frontends (placeholder config)
+        run: |
+          pnpm --filter @jj/customer-web build
+          pnpm --filter @jj/admin-web build
+        env:
+          VITE_CUSTOMER_POOL_ID: eu-central-1_placeholder
+          VITE_CUSTOMER_CLIENT_ID: placeholder
+          VITE_ADMIN_POOL_ID: eu-central-1_placeholder
+          VITE_ADMIN_CLIENT_ID: placeholder
+      - name: CDK synth
+        run: pnpm --filter @jj/infra synth
