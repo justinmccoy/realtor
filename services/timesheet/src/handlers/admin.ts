@@ -63,7 +63,34 @@ async function emitHours(
   });
 }
 
+const idsCsv = z
+  .string()
+  .min(1)
+  .max(2000)
+  .transform((v) => v.split(",").filter(Boolean))
+  .pipe(z.array(z.string().ulid()).min(1).max(50));
+
 export const handler = dispatch({
+  /** One-call dashboard aggregate: paid/open minutes per search. */
+  "GET /api/v1/admin/hours-summary": apiHandler({
+    query: z.object({ searchIds: idsCsv }),
+    fn: async ({ query, event }) => {
+      adminAuth(event);
+      const items = [];
+      for (const searchId of query.searchIds) {
+        const entries = await repo.listEntries(searchId);
+        items.push({
+          searchId,
+          totalMinutes: entries.reduce((a, e) => a + e.minutes, 0),
+          openMinutes: entries
+            .filter((e) => !e.paid)
+            .reduce((a, e) => a + e.minutes, 0)
+        });
+      }
+      return { body: { items } };
+    }
+  }),
+
   "GET /api/v1/admin/searches/{searchId}/hours": apiHandler({
     path: searchPath,
     query: listQuery,

@@ -40,7 +40,7 @@ function Carousel({
 }: {
   listing: CustomerListing;
   photos: PhotoWithUrl[];
-  onZoom: (url: string) => void;
+  onZoom: (urls: string[], idx: number) => void;
 }) {
   const [idx, setIdx] = useState(0);
   if (!photos.length) return null;
@@ -57,7 +57,7 @@ function Carousel({
         alt={`${listing.title} photo ${i + 1}`}
         onClick={() => {
           track("photo_viewed", listing.id);
-          onZoom(current.url);
+          onZoom(photos.map((p) => p.url), i);
         }}
       />
       {photos.length > 1 && (
@@ -87,6 +87,7 @@ export function ListingCard({
   comments,
   searchId,
   canRate,
+  isNew,
   expanded,
   onToggle,
   onZoom,
@@ -102,9 +103,10 @@ export function ListingCard({
   comments: Comment[];
   searchId: string;
   canRate: boolean;
+  isNew: boolean;
   expanded: boolean;
   onToggle: () => void;
-  onZoom: (url: string) => void;
+  onZoom: (urls: string[], idx: number) => void;
   onRatingsChanged: () => void;
   onCommentsChanged: () => void;
 }) {
@@ -144,8 +146,11 @@ export function ListingCard({
           <span className="pn">{districtNumber(l.bezirk)}</span>
           <span className="pb">{l.ortsteil ?? l.bezirk}</span>
         </span>
-        <span className="pill" data-st={l.status}>
-          {LISTING_STATUS_LABELS[l.status]}
+        <span style={{ display: "flex", gap: 6, alignItems: "center" }}>
+          {isNew && <span className="newtag">NEW</span>}
+          <span className="pill" data-st={l.status}>
+            {LISTING_STATUS_LABELS[l.status]}
+          </span>
         </span>
       </div>
       <h3>{l.title}</h3>
@@ -374,7 +379,7 @@ export function ListingCard({
                     alt={`Floor plan of ${l.title}`}
                     onClick={() => {
                       track("floorplan_viewed", l.id);
-                      onZoom(f.url);
+                      onZoom(floorplans.map((x) => x.url), floorplans.indexOf(f));
                     }}
                   />
                 </figure>
@@ -400,6 +405,17 @@ export function ListingCard({
       <div className="card-foot">
         <span></span>
         <span className="ed">
+          <button
+            className="btn ghost"
+            type="button"
+            title="Copy a direct link to this apartment"
+            onClick={() => {
+              const url = `${location.origin}${location.pathname}#listing-${l.id}`;
+              void navigator.clipboard.writeText(url);
+            }}
+          >
+            Link
+          </button>
           {l.url && (
             <a
               className="expose btn ghost"

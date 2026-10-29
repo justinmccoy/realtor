@@ -48,6 +48,9 @@ export const handler = dispatch({
       const search = await repo.getSearch(path.searchId);
       if (!search) throw ApiError.notFound("Search");
       const brief = await repo.getBrief(path.searchId);
+      // "New since your last visit" baseline — read before touching.
+      const member = await repo.getMember(path.searchId, auth.userId);
+      const prevSeenAt = member?.lastSeenAt ?? null;
 
       // Interaction tracking: at most one "opened the search" per 15 minutes.
       const fresh = await repo.touchLastSeen(path.searchId, auth.userId);
@@ -62,7 +65,7 @@ export const handler = dispatch({
           summary: `${auth.displayName} opened the search`
         });
       }
-      return { body: { search: searchLite(search), brief, role } };
+      return { body: { search: searchLite(search), brief, role, prevSeenAt } };
     }
   })
 });

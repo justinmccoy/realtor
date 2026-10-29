@@ -97,6 +97,31 @@ export function confirmRegistration(email: string, code: string): Promise<void> 
   });
 }
 
+export function startForgotPassword(email: string): Promise<void> {
+  const user = new CognitoUser({ Username: email, Pool: pool });
+  return new Promise((resolve, reject) => {
+    user.forgotPassword({
+      onSuccess: () => resolve(),
+      onFailure: reject,
+      inputVerificationCode: () => resolve() // code emailed; UI collects it
+    });
+  });
+}
+
+export function confirmForgotPassword(
+  email: string,
+  code: string,
+  newPassword: string
+): Promise<void> {
+  const user = new CognitoUser({ Username: email, Pool: pool });
+  return new Promise((resolve, reject) => {
+    user.confirmPassword(code, newPassword, {
+      onSuccess: () => resolve(),
+      onFailure: reject
+    });
+  });
+}
+
 export function resendCode(email: string): Promise<void> {
   const user = new CognitoUser({ Username: email, Pool: pool });
   return new Promise((resolve, reject) => {

@@ -30,9 +30,19 @@ export default function App() {
     location.hash === "#hours" ? "hours" : "listings"
   );
   const [filter, setFilter] = useState<Filter>("all");
-  const [sort, setSort] = useState<Sort>("new");
+  const [sort, setSortState] = useState<Sort>(
+    () => (localStorage.getItem("jj-sort") as Sort) || "new"
+  );
+  const setSort = (v: Sort) => {
+    setSortState(v);
+    try {
+      localStorage.setItem("jj-sort", v);
+    } catch {
+      /* private mode */
+    }
+  };
   const [open, setOpen] = useState<Set<string>>(new Set());
-  const [zoom, setZoom] = useState<string | null>(null);
+  const [zoom, setZoom] = useState<{ urls: string[]; idx: number } | null>(null);
   const [loadError, setLoadError] = useState("");
 
   const { data, error, refreshRatings, refreshComments } = useSearchData(searchId);
@@ -55,6 +65,19 @@ export default function App() {
     if (searchId) initTracking(searchId);
   }, [searchId]);
 
+  // Deep link: #listing-<id> expands and scrolls to that card once loaded.
+  useEffect(() => {
+    const m = location.hash.match(/^#listing-(.+)$/);
+    if (!m || !data) return;
+    const id = m[1]!;
+    if (data.listings.some((l) => l.id === id)) {
+      setOpen((o) => new Set(o).add(id));
+      requestAnimationFrame(() => {
+        document.getElementById(`card-${id}`)?.scrollIntoView({ block: "start" });
+      });
+    }
+  }, [data?.listings.length]);
+
   useEffect(() => {
     if (tab === "hours") track("hours_viewed");
     try {
@@ -63,6 +86,19 @@ export default function App() {
       /* ignore */
     }
   }, [tab]);
+
+  useEffect(() => {
+    if (!zoom) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setZoom(null);
+      if (e.key === "ArrowRight")
+        setZoom((z) => z && { ...z, idx: (z.idx + 1) % z.urls.length });
+      if (e.key === "ArrowLeft")
+        setZoom((z) => z && { ...z, idx: (z.idx - 1 + z.urls.length) % z.urls.length });
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [zoom !== null]);
 
   const avgScore = useMemo(() => {
     const map = new Map<string, { sum: number; n: number }>();
@@ -108,6 +144,11 @@ export default function App() {
   if (!data || !searchId) return <div className="loading">Loading the board…</div>;
 
   const listings = data.listings;
+  const newIds = new Set(
+    data.prevSeenAt
+      ? listings.filter((l) => l.createdAt > data.prevSeenAt!).map((l) => l.id)
+      : []
+  );
   const benchmark = listings.find((l) => l.benchmark);
   const counts: Record<string, number> = { all: listings.length };
   for (const s of LISTING_STATUSES) {
@@ -123,6 +164,11 @@ export default function App() {
       .sort((a, b) => a.sortOrder - b.sortOrder);
 
   const goto = (id: string) => {
+    try {
+      history.replaceState(null, "", `#listing-${id}`);
+    } catch {
+      /* ignore */
+    }
     setOpen((o) => new Set(o).add(id));
     requestAnimationFrame(() => {
       document.getElementById(`card-${id}`)?.scrollIntoView({
@@ -236,6 +282,12 @@ export default function App() {
             </div>
           </div>
 
+          {newIds.size > 0 && (
+            <p className="note-line" style={{ margin: 0 }}>
+              <span className="newtag">NEW</span> {newIds.size} apartment
+              {newIds.size > 1 ? "s" : ""} added since your last visit.
+            </p>
+          )}
           {cards.length === 0 ? (
             <div className="empty">
               <h3>No listings yet</h3>
@@ -255,6 +307,7 @@ export default function App() {
                   comments={data.comments}
                   searchId={searchId}
                   canRate={data.role === "client"}
+                  isNew={newIds.has(l.id)}
                   expanded={open.has(l.id)}
                   onToggle={() =>
                     setOpen((o) => {
@@ -264,7 +317,7 @@ export default function App() {
                       return next;
                     })
                   }
-                  onZoom={setZoom}
+                  onZoom={(urls, idx) => setZoom({ urls, idx })}
                   onRatingsChanged={() => void refreshRatings()}
                   onCommentsChanged={() => void refreshComments()}
                 />
@@ -297,13 +350,45 @@ export default function App() {
 
       {zoom && (
         <div className="modal lightbox" onClick={() => setZoom(null)}>
-          <div style={{ width: "100%", maxWidth: 1100, display: "flex", flexDirection: "column", gap: 10 }}>
-            <div style={{ textAlign: "right" }}>
+          <div
+            style={{ width: "100%", maxWidth: 1100, display: "flex", flexDirection: "column", gap: 10 }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span className="note-line num">
+                {zoom.idx + 1} / {zoom.urls.length}
+              </span>
               <button className="btn" type="button" onClick={() => setZoom(null)}>
                 Close
               </button>
             </div>
-            <img src={zoom} alt="" />
+            <div style={{ position: "relative" }}>
+              <img src={zoom.urls[zoom.idx]} alt="" />
+              {zoom.urls.length > 1 && (
+                <>
+                  <button
+                    className="nav l"
+                    type="button"
+                    aria-label="Previous photo"
+                    style={{ position: "absolute", top: "50%", left: 10 }}
+                    onClick={() =>
+                      setZoom({ ...zoom, idx: (zoom.idx - 1 + zoom.urls.length) % zoom.urls.length })
+                    }
+                  >
+                    ‹
+                  </button>
+                  <button
+                    className="nav r"
+                    type="button"
+                    aria-label="Next photo"
+                    style={{ position: "absolute", top: "50%", right: 10 }}
+                    onClick={() => setZoom({ ...zoom, idx: (zoom.idx + 1) % zoom.urls.length })}
+                  >
+                    ›
+                  </button>
+                </>
+              )}
+            </div>
           </div>
         </div>
       )}

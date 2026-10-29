@@ -71,24 +71,22 @@ export function Clients({
           );
         }
       }
-      const cutoff = Date.now() - 30 * 86_400_000;
+      // One aggregate call for all members' 30-day activity counts.
+      const allMemberIds = [
+        ...new Set(perSearch.flatMap((p) => p.detail.members.map((m) => m.userId)))
+      ];
+      let eventsByActor = new Map<string, number>();
+      try {
+        const summary = await api.activitySummary({ actorIds: allMemberIds });
+        eventsByActor = new Map(summary.actors.map((a) => [a.actorId, a.events30d]));
+      } catch {
+        /* column shows 0; the page still renders */
+      }
       const built: ClientRow[] = [];
       for (const { search, detail, visibleCount, ratings, comments } of perSearch) {
         for (const member of detail.members) {
           const mine = ratings.items.filter((r) => r.userId === member.userId);
-          // Activity is nice-to-have; never let it block the roster.
-          let events30d = 0;
-          try {
-            const activity = await api.activity({
-              actorId: member.userId,
-              limit: 100
-            });
-            events30d = activity.items.filter(
-              (e) => new Date(e.at).getTime() >= cutoff
-            ).length;
-          } catch {
-            /* column shows 0; the page still renders */
-          }
+          const events30d = eventsByActor.get(member.userId) ?? 0;
           built.push({
             member,
             search,

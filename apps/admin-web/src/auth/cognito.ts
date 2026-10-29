@@ -123,6 +123,31 @@ export function submitTotp(
   });
 }
 
+export function startForgotPassword(email: string): Promise<void> {
+  const user = new CognitoUser({ Username: email, Pool: pool });
+  return new Promise((resolve, reject) => {
+    user.forgotPassword({
+      onSuccess: () => resolve(),
+      onFailure: reject,
+      inputVerificationCode: () => resolve()
+    });
+  });
+}
+
+export function confirmForgotPassword(
+  email: string,
+  code: string,
+  newPassword: string
+): Promise<void> {
+  const user = new CognitoUser({ Username: email, Pool: pool });
+  return new Promise((resolve, reject) => {
+    user.confirmPassword(code, newPassword, {
+      onSuccess: () => resolve(),
+      onFailure: reject
+    });
+  });
+}
+
 export function restoreSession(): Promise<SignedIn | null> {
   const user = pool.getCurrentUser();
   if (!user) return Promise.resolve(null);

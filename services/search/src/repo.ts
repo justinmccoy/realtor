@@ -211,6 +211,16 @@ export async function putMember(member: Member): Promise<void> {
   await ddb().send(new PutCommand({ TableName: T(), Item: item }));
 }
 
+export async function getMember(
+  searchId: string,
+  userId: string
+): Promise<Member | null> {
+  const res = await ddb().send(
+    new GetCommand({ TableName: T(), Key: searchKeys.member(searchId, userId) })
+  );
+  return res.Item ? itemToMember(res.Item) : null;
+}
+
 export async function removeMember(
   searchId: string,
   userId: string

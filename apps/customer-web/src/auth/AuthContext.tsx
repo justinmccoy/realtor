@@ -23,6 +23,8 @@ interface AuthApi extends AuthState {
   register: typeof cognito.register;
   confirm: typeof cognito.confirmRegistration;
   resendCode: typeof cognito.resendCode;
+  startForgotPassword: typeof cognito.startForgotPassword;
+  confirmForgotPassword: typeof cognito.confirmForgotPassword;
   signOut: () => void;
 }
 
@@ -61,6 +63,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     register: cognito.register,
     confirm: cognito.confirmRegistration,
     resendCode: cognito.resendCode,
+    startForgotPassword: cognito.startForgotPassword,
+    confirmForgotPassword: cognito.confirmForgotPassword,
     signOut: () => {
       cognito.signOut();
       setState({ status: "signedOut", name: "", email: "" });

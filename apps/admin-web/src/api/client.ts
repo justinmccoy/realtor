@@ -254,6 +254,29 @@ export const api = {
   discardTimer: (sid: string) =>
     call<void>(`/admin/searches/${sid}/timer`, { method: "DELETE" }),
 
+  /* aggregates (one invocation regardless of search count) */
+  hoursSummary: (searchIds: string[]) =>
+    searchIds.length === 0
+      ? Promise.resolve({ items: [] as { searchId: string; totalMinutes: number; openMinutes: number }[] })
+      : call<{ items: { searchId: string; totalMinutes: number; openMinutes: number }[] }>(
+          `/admin/hours-summary?searchIds=${searchIds.slice(0, 50).join(",")}`
+        ),
+  activitySummary: (params: { searchIds?: string[]; actorIds?: string[] }) => {
+    const q = new URLSearchParams();
+    if (params.searchIds?.length) q.set("searchIds", params.searchIds.slice(0, 50).join(","));
+    if (params.actorIds?.length) q.set("actorIds", params.actorIds.slice(0, 100).join(","));
+    if (!q.toString()) {
+      return Promise.resolve({
+        searches: [] as { searchId: string; lastActivityAt: string | null }[],
+        actors: [] as { actorId: string; events30d: number }[]
+      });
+    }
+    return call<{
+      searches: { searchId: string; lastActivityAt: string | null }[];
+      actors: { actorId: string; events30d: number }[];
+    }>(`/admin/activity-summary?${q.toString()}`);
+  },
+
   /* activity */
   activity: (params: { searchId?: string; actorId?: string; limit?: number } = {}) =>
     call<{ items: ActivityRecord[]; nextCursor: string | null }>(

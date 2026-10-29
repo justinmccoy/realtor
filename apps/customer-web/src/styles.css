@@ -133,3 +133,28 @@ img {
 .fatal {
   color: var(--warn);
 }
+
+/* new-since-last-visit */
+.newtag {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: var(--sign);
+  color: var(--sign-ink);
+  padding: 2px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+.lightbox .nav {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 0;
+  background: color-mix(in srgb, var(--surface) 85%, transparent);
+  color: var(--ink);
+  cursor: pointer;
+  font-size: 20px;
+  line-height: 1;
+  transform: translateY(-50%);
+}

@@ -61,6 +61,12 @@ export class TimesheetStack extends Stack {
     const { httpApi, adminAuthorizer, customerAuthorizer } = routes;
 
     httpApi.addRoutes({
+      path: "/api/v1/admin/hours-summary",
+      methods: [HttpMethod.GET],
+      integration: adminInt,
+      authorizer: adminAuthorizer
+    });
+    httpApi.addRoutes({
       path: "/api/v1/admin/searches/{searchId}/hours",
       methods: [HttpMethod.GET, HttpMethod.POST],
       integration: adminInt,

@@ -20,6 +20,16 @@ export interface AppConfig {
   domain?: DomainConfig;
   /** Origins allowed by API CORS (local Vite dev servers; custom domains are added automatically). */
   devOrigins: string[];
+  /** Email notifications (SES). All optional — unset disables sending. */
+  notify: {
+    /** Verified SES identity used as the From address. */
+    mailFrom?: string;
+    /** Where client activity notifications go (JJ's inbox). */
+    adminEmail?: string;
+    /** App URLs used for links in emails (CloudFront or custom domains). */
+    customerUrl?: string;
+    adminUrl?: string;
+  };
 }
 
 export function getConfig(app: App): AppConfig {
@@ -35,6 +45,12 @@ export function getConfig(app: App): AppConfig {
     enableWaf?: boolean;
     alarmEmail?: string;
     domain?: DomainConfig | null;
+    notify?: {
+      mailFrom?: string;
+      adminEmail?: string;
+      customerUrl?: string;
+      adminUrl?: string;
+    };
   };
   return {
     envName,
@@ -45,7 +61,8 @@ export function getConfig(app: App): AppConfig {
     enableWaf: raw.enableWaf ?? envName === "prod",
     alarmEmail: raw.alarmEmail || undefined,
     domain: raw.domain ?? undefined,
-    devOrigins: ["http://localhost:5173", "http://localhost:5174"]
+    devOrigins: ["http://localhost:5173", "http://localhost:5174"],
+    notify: raw.notify ?? {}
   };
 }
 

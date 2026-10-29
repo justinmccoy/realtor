@@ -93,6 +93,12 @@ export class ActivityStack extends Stack {
     const { httpApi, adminAuthorizer, customerAuthorizer } = routes;
 
     httpApi.addRoutes({
+      path: "/api/v1/admin/activity-summary",
+      methods: [HttpMethod.GET],
+      integration: adminInt,
+      authorizer: adminAuthorizer
+    });
+    httpApi.addRoutes({
       path: "/api/v1/admin/activity",
       methods: [HttpMethod.GET],
       integration: adminInt,

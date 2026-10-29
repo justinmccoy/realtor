@@ -21,6 +21,8 @@ function TotpQr({ value }: { value: string }) {
 
 type Pending =
   | { kind: "none" }
+  | { kind: "forgot" }
+  | { kind: "reset" }
   | cognito.NewPasswordRequired
   | cognito.MfaSetup
   | cognito.TotpRequired;
@@ -67,6 +69,31 @@ export function Login() {
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
+    if (pending.kind === "forgot") {
+      setBusy(true);
+      setError("");
+      void cognito
+        .startForgotPassword(email.trim())
+        .then(() => setPending({ kind: "reset" }))
+        .catch((err) => setError(err instanceof Error ? err.message : "Failed"))
+        .finally(() => setBusy(false));
+      return;
+    }
+    if (pending.kind === "reset") {
+      setBusy(true);
+      setError("");
+      void cognito
+        .confirmForgotPassword(email.trim(), code.trim(), password)
+        .then(() => {
+          setPending({ kind: "none" });
+          setPassword("");
+          setCode("");
+          setError("");
+        })
+        .catch((err) => setError(err instanceof Error ? err.message : "Failed"))
+        .finally(() => setBusy(false));
+      return;
+    }
     if (pending.kind === "none") {
       void run(() => cognito.signIn(email.trim(), password));
     } else if (pending.kind === "newPasswordRequired") {
@@ -161,10 +188,69 @@ export function Login() {
               />
             </div>
           )}
+          {pending.kind === "forgot" && (
+            <div className="field">
+              <label>Email</label>
+              <input
+                type="email"
+                value={email}
+                autoComplete="username"
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+            </div>
+          )}
+          {pending.kind === "reset" && (
+            <>
+              <p className="note-line" style={{ margin: 0 }}>
+                We emailed you a reset code.
+              </p>
+              <div className="field">
+                <label>Reset code</label>
+                <input
+                  inputMode="numeric"
+                  value={code}
+                  autoComplete="one-time-code"
+                  onChange={(e) => setCode(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="field">
+                <label>New password (14+ chars, mixed)</label>
+                <input
+                  type="password"
+                  value={password}
+                  autoComplete="new-password"
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+              </div>
+            </>
+          )}
           {error && <p className="err">{error}</p>}
           <button className="btn primary" disabled={busy} type="submit">
-            {pending.kind === "none" ? "Sign in" : "Continue"}
+            {pending.kind === "none"
+              ? "Sign in"
+              : pending.kind === "forgot"
+                ? "Send reset code"
+                : pending.kind === "reset"
+                  ? "Set new password"
+                  : "Continue"}
           </button>
+          {pending.kind === "none" && (
+            <span className="auth-switch">
+              <button type="button" onClick={() => setPending({ kind: "forgot" })}>
+                Forgot password?
+              </button>
+            </span>
+          )}
+          {(pending.kind === "forgot" || pending.kind === "reset") && (
+            <span className="auth-switch">
+              <button type="button" onClick={() => setPending({ kind: "none" })}>
+                Back to sign in
+              </button>
+            </span>
+          )}
         </form>
       </div>
     </div>

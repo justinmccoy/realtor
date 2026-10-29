@@ -29,7 +29,20 @@ export default function App() {
     localStorage.getItem("jj-admin-search") || null
   );
   const [detail, setDetail] = useState<SearchDetail | null>(null);
-  const [page, setPage] = useState<Page>("dashboard");
+  const PAGES: Page[] = ["dashboard", "clients", "overview", "listings", "hours", "engagement", "audit"];
+  const [page, setPageState] = useState<Page>(() => {
+    const h = location.hash.replace("#", "") as Page;
+    return PAGES.includes(h) ? h : "dashboard";
+  });
+  const setPage = (p: Page) => {
+    setPageState(p);
+    try {
+      history.replaceState(null, "", `#${p}`);
+    } catch {
+      /* ignore */
+    }
+  };
+  const [focusListingId, setFocusListingId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [toastEl, toast] = useToast();
 
@@ -168,9 +181,13 @@ export default function App() {
       {page === "dashboard" && (
         <Dashboard
           searches={searches}
-          onOpenSearch={(sid) => {
+          onOpenSearch={(sid, target) => {
             setSearchId(sid);
-            setPage("overview");
+            setPage(target ?? "overview");
+          }}
+          onOpenListing={(lid) => {
+            setFocusListingId(lid);
+            setPage("listings");
           }}
         />
       )}
@@ -196,7 +213,13 @@ export default function App() {
         ) : (
           <div className="loading">Pick or create a search.</div>
         ))}
-      {page === "listings" && <Listings searches={searches} />}
+      {page === "listings" && (
+        <Listings
+          searches={searches}
+          focusListingId={focusListingId}
+          onFocusHandled={() => setFocusListingId(null)}
+        />
+      )}
       {page === "hours" && current && <Hours search={current} />}
       {page === "engagement" && searchId && <Engagement searchId={searchId} />}
       {page === "audit" && <Audit />}

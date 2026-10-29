@@ -11,10 +11,12 @@ interface SearchStats {
 
 export function Dashboard({
   searches,
-  onOpenSearch
+  onOpenSearch,
+  onOpenListing
 }: {
   searches: Search[];
-  onOpenSearch: (sid: string) => void;
+  onOpenSearch: (sid: string, page?: "overview" | "engagement") => void;
+  onOpenListing: (listingId: string) => void;
 }) {
   const [feed, setFeed] = useState<ActivityRecord[]>([]);
   const [viewings, setViewings] = useState<Listing[]>([]);
@@ -26,20 +28,26 @@ export function Dashboard({
   }, []);
 
   useEffect(() => {
-    const active = searches.filter((s) => s.status === "active").slice(0, 20);
-    void Promise.all(
-      active.map(async (search) => {
-        const [hours, activity] = await Promise.all([
-          api.hours(search.id, { paid: false }),
-          api.activity({ searchId: search.id, limit: 1 })
-        ]);
-        return {
+    // Two aggregate calls instead of 2 per search — kinder to Lambda
+    // concurrency limits and much faster.
+    const active = searches.filter((s) => s.status === "active").slice(0, 50);
+    const ids = active.map((s) => s.id);
+    void Promise.all([
+      api.hoursSummary(ids),
+      api.activitySummary({ searchIds: ids })
+    ]).then(([hours, activity]) => {
+      const open = new Map(hours.items.map((h) => [h.searchId, h.openMinutes]));
+      const last = new Map(
+        activity.searches.map((a) => [a.searchId, a.lastActivityAt])
+      );
+      setStats(
+        active.map((search) => ({
           search,
-          openMinutes: hours.items.reduce((a, h) => a + h.minutes, 0),
-          lastActivity: activity.items[0]?.at ?? null
-        } satisfies SearchStats;
-      })
-    ).then(setStats);
+          openMinutes: open.get(search.id) ?? 0,
+          lastActivity: last.get(search.id) ?? null
+        }))
+      );
+    });
   }, [searches]);
 
   const inactive = (iso: string | null) =>
@@ -93,7 +101,14 @@ export function Dashboard({
               <li key={l.id}>
                 <span className="t">{l.viewingAt ? fmtWhen(l.viewingAt) : ""}</span>
                 <span>
-                  {l.title}
+                  <button
+                    type="button"
+                    className="t5title"
+                    style={{ fontSize: 15 }}
+                    onClick={() => onOpenListing(l.id)}
+                  >
+                    {l.title}
+                  </button>
                   <small className="muted"> · {l.bezirk}</small>
                 </span>
                 <span className="who">{l.price ? eur(l.price) : ""}</span>
@@ -114,7 +129,20 @@ export function Dashboard({
             {feed.map((e) => (
               <li key={e.id}>
                 <span className="t">{fmtWhen(e.at)}</span>
-                <span>{e.summary}</span>
+                <span>
+                  {e.searchId ? (
+                    <button
+                      type="button"
+                      className="t5title"
+                      style={{ fontSize: 15 }}
+                      onClick={() => onOpenSearch(e.searchId!, "engagement")}
+                    >
+                      {e.summary}
+                    </button>
+                  ) : (
+                    e.summary
+                  )}
+                </span>
                 <span className="who">{e.actorRole}</span>
               </li>
             ))}

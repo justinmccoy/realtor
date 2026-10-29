@@ -1,9 +1,10 @@
-import { Stack, type StackProps } from "aws-cdk-lib";
+import { Duration, Stack, type StackProps } from "aws-cdk-lib";
 import { HttpMethod } from "aws-cdk-lib/aws-apigatewayv2";
 import { HttpLambdaIntegration } from "aws-cdk-lib/aws-apigatewayv2-integrations";
 import type * as cognito from "aws-cdk-lib/aws-cognito";
 import type * as dynamodb from "aws-cdk-lib/aws-dynamodb";
-import type * as events from "aws-cdk-lib/aws-events";
+import * as events from "aws-cdk-lib/aws-events";
+import * as targets from "aws-cdk-lib/aws-events-targets";
 import * as iam from "aws-cdk-lib/aws-iam";
 import type * as sns from "aws-cdk-lib/aws-sns";
 import type { Construct } from "constructs";
@@ -64,6 +65,38 @@ export class SearchStack extends Stack {
     table.grantReadWriteData(customerFn); // reads + lastSeen touch
     bus.grantPutEventsTo(customerFn);
     addFunctionAlarms(this, "Customer", customerFn, props.alarmTopic);
+
+    // Email notifications: this service owns member emails, so it sends.
+    const notifyFn = new ServiceFunction(this, "NotifyFn", {
+      config,
+      serviceName: "search-notify",
+      entry: "services/search/src/handlers/notify.ts",
+      description: "Search service: email notifications from domain events",
+      timeout: Duration.seconds(30),
+      environment: {
+        ...common,
+        MAIL_FROM: config.notify.mailFrom ?? "",
+        ADMIN_NOTIFY_EMAIL: config.notify.adminEmail ?? "",
+        CUSTOMER_URL: config.notify.customerUrl ?? "",
+        ADMIN_URL: config.notify.adminUrl ?? ""
+      }
+    }).fn;
+    table.grantReadData(notifyFn);
+    notifyFn.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ["ses:SendEmail"],
+        resources: ["*"] // SES identities are account-scoped; From is pinned by env
+      })
+    );
+    addFunctionAlarms(this, "Notify", notifyFn, props.alarmTopic);
+    new events.Rule(this, "NotifyEvents", {
+      eventBus: bus,
+      eventPattern: {
+        source: ["jj.listing", "jj.engagement"],
+        detailType: ["listing.shared", "comment.created", "rating.saved"]
+      },
+      targets: [new targets.LambdaFunction(notifyFn, { retryAttempts: 2 })]
+    });
 
     const adminInt = new HttpLambdaIntegration("AdminInt", adminFn);
     const customerInt = new HttpLambdaIntegration("CustomerInt", customerFn);

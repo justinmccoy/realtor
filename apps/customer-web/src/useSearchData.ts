@@ -13,6 +13,8 @@ import { api } from "./api/client";
 
 export interface SearchData {
   clientName: string;
+  /** lastSeenAt before this visit — baseline for "new since your last visit". */
+  prevSeenAt: string | null;
   settings: Settings;
   brief: Brief;
   role: MemberRole;
@@ -44,6 +46,7 @@ export function useSearchData(searchId: string | null) {
       );
       setData({
         clientName: detail.search.clientName,
+        prevSeenAt: detail.prevSeenAt,
         settings: detail.search.settings,
         brief: detail.brief,
         role: detail.role,

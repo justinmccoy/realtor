@@ -63,9 +63,12 @@ export interface SearchLite {
 export const api = {
   mySearches: () => call<{ items: SearchLite[] }>("/searches"),
   searchDetail: (sid: string) =>
-    call<{ search: Omit<SearchLite, "role">; brief: Brief; role: MemberRole }>(
-      `/searches/${sid}`
-    ),
+    call<{
+      search: Omit<SearchLite, "role">;
+      brief: Brief;
+      role: MemberRole;
+      prevSeenAt: string | null;
+    }>(`/searches/${sid}`),
   listings: (sid: string) =>
     call<{ items: CustomerListing[] }>(`/searches/${sid}/listings?limit=200`),
   photos: (sid: string, listingIds: string[]) =>

@@ -33,7 +33,15 @@ const REASON_LABEL: Record<VisibilityReason, string> = {
   draft: "draft"
 };
 
-export function Listings({ searches }: { searches: Search[] }) {
+export function Listings({
+  searches,
+  focusListingId,
+  onFocusHandled
+}: {
+  searches: Search[];
+  focusListingId?: string | null;
+  onFocusHandled?: () => void;
+}) {
   const [listings, setListings] = useState<Listing[]>([]);
   const [contexts, setContexts] = useState<SearchCtx[]>([]);
   const [status, setStatus] = useState<"" | ListingStatus>("");
@@ -79,6 +87,14 @@ export function Listings({ searches }: { searches: Search[] }) {
   useEffect(() => {
     void reload();
   }, [reload]);
+
+  // Dashboard click-through: open the editor for the requested listing.
+  useEffect(() => {
+    if (!focusListingId || !listings.length) return;
+    const target = listings.find((l) => l.id === focusListingId);
+    if (target) setEditor({ listing: target });
+    onFocusHandled?.();
+  }, [focusListingId, listings.length]);
 
   const toggleAll = () =>
     setSelected(
@@ -155,6 +171,29 @@ export function Listings({ searches }: { searches: Search[] }) {
             {LISTING_STATUSES.map((s) => (
               <option key={s} value={s}>
                 {LISTING_STATUS_LABELS[s]}
+              </option>
+            ))}
+          </select>
+          <select
+            className="inline"
+            defaultValue=""
+            onChange={(e) => {
+              const sid = e.target.value;
+              e.target.value = "";
+              if (!sid) return;
+              void (async () => {
+                for (const lid of selected) {
+                  await api.putShare(sid, lid, "shared");
+                }
+                toast(`Shared ${selected.size} listing(s)`);
+                await reload();
+              })();
+            }}
+          >
+            <option value="">Share with…</option>
+            {active.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.clientName}
               </option>
             ))}
           </select>

@@ -10,7 +10,13 @@
         "region": "eu-central-1",
         "logRetentionDays": 30,
         "removalPolicy": "destroy",
-        "enableWaf": false
+        "enableWaf": false,
+        "notify": {
+          "mailFrom": "",
+          "adminEmail": "",
+          "customerUrl": "",
+          "adminUrl": ""
+        }
       },
       "prod": {
         "region": "eu-central-1",

@@ -2,7 +2,7 @@ import { useState, type FormEvent } from "react";
 import { useAuth } from "../auth/AuthContext";
 import type { NewPasswordRequired } from "../auth/cognito";
 
-type Mode = "signin" | "register" | "confirm" | "newPassword";
+type Mode = "signin" | "register" | "confirm" | "newPassword" | "forgot" | "reset";
 
 export function Login() {
   const auth = useAuth();
@@ -57,6 +57,25 @@ export function Login() {
     });
   }
 
+  function onForgot(e: FormEvent) {
+    e.preventDefault();
+    void run(async () => {
+      await auth.startForgotPassword(email.trim());
+      setMode("reset");
+      setNotice("We emailed you a reset code.");
+    });
+  }
+
+  function onReset(e: FormEvent) {
+    e.preventDefault();
+    void run(async () => {
+      await auth.confirmForgotPassword(email.trim(), code.trim(), password);
+      setMode("signin");
+      setNotice("Password updated — sign in with it now.");
+      setCode("");
+    });
+  }
+
   function onConfirm(e: FormEvent) {
     e.preventDefault();
     void run(async () => {
@@ -97,6 +116,7 @@ export function Login() {
 
         {mode === "signin" && (
           <form onSubmit={onSignIn}>
+            {notice && <p className="note-line" style={{ margin: 0 }}>{notice}</p>}
             {field("Email", email, setEmail, "email", "username")}
             {field("Password", password, setPassword, "password", "current-password")}
             {error && <p className="err">{error}</p>}
@@ -110,7 +130,41 @@ export function Login() {
               <button type="button" onClick={() => setMode("register")}>
                 Create an account
               </button>
+              {" · "}
+              <button type="button" onClick={() => setMode("forgot")}>
+                Forgot password?
+              </button>
             </span>
+          </form>
+        )}
+
+        {mode === "forgot" && (
+          <form onSubmit={onForgot}>
+            <p className="note-line" style={{ margin: 0 }}>
+              Enter your email and we'll send a reset code.
+            </p>
+            {field("Email", email, setEmail, "email", "username")}
+            {error && <p className="err">{error}</p>}
+            <button className="btn primary" disabled={busy} type="submit">
+              Send reset code
+            </button>
+            <span className="auth-switch">
+              <button type="button" onClick={() => setMode("signin")}>
+                Back to sign in
+              </button>
+            </span>
+          </form>
+        )}
+
+        {mode === "reset" && (
+          <form onSubmit={onReset}>
+            {notice && <p className="note-line" style={{ margin: 0 }}>{notice}</p>}
+            {field("Reset code", code, setCode, "text", "one-time-code")}
+            {field("New password (12+ characters)", password, setPassword, "password", "new-password")}
+            {error && <p className="err">{error}</p>}
+            <button className="btn primary" disabled={busy} type="submit">
+              Set new password
+            </button>
           </form>
         )}
 
