@@ -80,13 +80,18 @@ export default function App() {
   }, [data?.listings.length]);
 
   useEffect(() => {
+    // Only manage the hash while signed in — the login page must not carry
+    // stale app state, and an incoming #listing-<id> deep link must survive
+    // the sign-in roundtrip untouched.
+    if (auth.status !== "signedIn") return;
     if (tab === "hours") track("hours_viewed");
+    if (tab === "listings" && /^#listing-/.test(location.hash)) return;
     try {
       history.replaceState(null, "", `#${tab}`);
     } catch {
       /* ignore */
     }
-  }, [tab]);
+  }, [tab, auth.status]);
 
   useEffect(() => {
     if (!zoom) return;
@@ -411,7 +416,18 @@ function Header({ clientName }: { clientName: string | null }) {
       </div>
       <div className="head-actions">
         <span className="note-line">{auth.name || auth.email}</span>
-        <button className="btn ghost" type="button" onClick={auth.signOut}>
+        <button
+          className="btn ghost"
+          type="button"
+          onClick={() => {
+            auth.signOut();
+            try {
+              history.replaceState(null, "", location.pathname + location.search);
+            } catch {
+              /* ignore */
+            }
+          }}
+        >
           Sign out
         </button>
       </div>
