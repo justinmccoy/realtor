@@ -58,7 +58,10 @@ const viewingsQuery = z.object({
   days: z.coerce.number().int().min(1).max(90).default(14)
 });
 
-const listQuery = pageQuerySchema.merge(listingListQuerySchema);
+const listQuery = pageQuerySchema.merge(listingListQuerySchema).extend({
+  // The admin table loads the whole pool in one page.
+  limit: z.coerce.number().int().min(1).max(500).default(200)
+});
 
 async function emitListing(
   type: DomainEventType,
