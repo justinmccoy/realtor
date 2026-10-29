@@ -3,7 +3,15 @@ import type { Comment } from "@jj/shared";
 import { api } from "../api/client";
 import { fmtWhen } from "../lib/format";
 
-function CommentItem({ c, onReply }: { c: Comment; onReply: (c: Comment) => void }) {
+function CommentItem({
+  c,
+  onReply,
+  canReply,
+}: {
+  c: Comment;
+  onReply: (c: Comment) => void;
+  canReply: boolean;
+}) {
   return (
     <li className={`cmt${c.parentId ? " reply" : ""}`}>
       <span className="who">
@@ -16,7 +24,7 @@ function CommentItem({ c, onReply }: { c: Comment; onReply: (c: Comment) => void
       ) : (
         <p>{c.body}</p>
       )}
-      {!c.parentId && !c.deletedAt && (
+      {canReply && !c.parentId && !c.deletedAt && (
         <button className="btn ghost" type="button" onClick={() => onReply(c)}>
           Reply
         </button>
@@ -31,13 +39,16 @@ export function CommentThread({
   listingId,
   comments,
   onChanged,
-  placeholder
+  placeholder,
+  canComment = true,
 }: {
   searchId: string;
   listingId: string | null;
   comments: Comment[];
   onChanged: () => void;
   placeholder: string;
+  /** Viewers are read-only: the thread shows, the reply box doesn't. */
+  canComment?: boolean;
 }) {
   const scoped = comments.filter((c) => c.listingId === listingId);
   const roots = scoped.filter((c) => !c.parentId);
@@ -59,7 +70,7 @@ export function CommentThread({
       await api.postComment(searchId, {
         listingId,
         parentId: replyTo?.id ?? null,
-        body: body.trim()
+        body: body.trim(),
       });
       setBody("");
       setReplyTo(null);
@@ -77,38 +88,60 @@ export function CommentThread({
         <ul className="cmt-list">
           {roots.map((root) => (
             <Fragment key={root.id}>
-              <CommentItem c={root} onReply={setReplyTo} />
+              <CommentItem
+                c={root}
+                onReply={setReplyTo}
+                canReply={canComment}
+              />
               {replies(root.id).map((r) => (
-                <CommentItem key={r.id} c={r} onReply={setReplyTo} />
+                <CommentItem
+                  key={r.id}
+                  c={r}
+                  onReply={setReplyTo}
+                  canReply={canComment}
+                />
               ))}
             </Fragment>
           ))}
         </ul>
       )}
-      {replyTo && (
-        <span className="replying">
-          Replying to {replyTo.authorName} ·{" "}
-          <button className="btn ghost" type="button" onClick={() => setReplyTo(null)}>
-            cancel
-          </button>
-        </span>
+      {!canComment && roots.length === 0 && (
+        <p className="note-line" style={{ margin: 0 }}>
+          No comments yet.
+        </p>
       )}
-      <textarea
-        value={body}
-        placeholder={placeholder}
-        onChange={(e) => setBody(e.target.value)}
-      />
-      <div className="cmt-actions">
-        {msg && <span className="err">{msg}</span>}
-        <button
-          className="btn primary"
-          type="button"
-          disabled={busy || !body.trim()}
-          onClick={() => void post()}
-        >
-          {replyTo ? "Post reply" : "Add a comment"}
-        </button>
-      </div>
+      {canComment && (
+        <>
+          {replyTo && (
+            <span className="replying">
+              Replying to {replyTo.authorName} ·{" "}
+              <button
+                className="btn ghost"
+                type="button"
+                onClick={() => setReplyTo(null)}
+              >
+                cancel
+              </button>
+            </span>
+          )}
+          <textarea
+            value={body}
+            placeholder={placeholder}
+            onChange={(e) => setBody(e.target.value)}
+          />
+          <div className="cmt-actions">
+            {msg && <span className="err">{msg}</span>}
+            <button
+              className="btn primary"
+              type="button"
+              disabled={busy || !body.trim()}
+              onClick={() => void post()}
+            >
+              {replyTo ? "Post reply" : "Add a comment"}
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }

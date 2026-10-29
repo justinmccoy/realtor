@@ -46,10 +46,7 @@ export const handler = dispatch({
       const auth = customerAuth(event);
       const role = requireSearchAccess(auth, path.searchId);
       if (role === "viewer") {
-        // Mirrors the artifact: viewers can comment but not save star ratings.
-        throw ApiError.forbidden(
-          "Star ratings can't be saved with viewer access — leave your rating as a comment instead"
-        );
+        throw ApiError.forbidden("Viewers can't rate apartments");
       }
       const meta = await repo.requireListingActive(path.listingId, {
         mustBePublished: true
@@ -121,6 +118,9 @@ export const handler = dispatch({
     fn: async ({ path, body, event }) => {
       const auth = customerAuth(event);
       const role = requireSearchAccess(auth, path.searchId);
+      if (role === "viewer") {
+        throw ApiError.forbidden("Viewers can't comment");
+      }
       let listingTitle: string | null = null;
       if (body.listingId) {
         const meta = await repo.requireListingActive(body.listingId, {

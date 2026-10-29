@@ -359,8 +359,8 @@
     </div>
     <div class="mini">
       <h3>Viewer</h3>
-      <p>Same as client, except star ratings are blocked (they're nudged to
-      rate in a comment instead) — mirroring the original prototype's behavior.</p>
+      <p>Read-only: same visibility as a client, but ratings and comments are
+      rejected by the engagement handler. Viewers also can't invite others.</p>
     </div>
     <div class="mini">
       <h3>Admin</h3>
@@ -407,7 +407,7 @@
     <li>Brian clicks 5 stars → <code>PUT /api/v1/searches/S1/listings/L7/rating</code> with his customer-pool token.</li>
     <li>CloudFront (www) forwards <code>/api/*</code> to API Gateway, same origin.</li>
     <li>The <b>Lambda authorizer</b> verifies the token signature against the customer pool and queries the search table's membership index: Brian → <code>{S1: client}</code>. Cached 5 min.</li>
-    <li>The <b>engagement</b> handler validates the body with zod, checks Brian's role in S1 (clients may rate; viewers may not), and checks its local listing meta: L7 belongs to S1 <em>and</em> is published.</li>
+    <li>The <b>engagement</b> handler validates the body with zod, checks Brian's role in S1 (clients may rate and comment; viewers are read-only), and checks its local listing meta: L7 belongs to S1 <em>and</em> is published.</li>
     <li>The rating is upserted (one per user per listing) and <code>rating.saved</code> — "Brian rated ‘Top-floor flat with roof terrace’ 5★" — goes onto the bus.</li>
     <li>The <b>activity</b> sink writes it to S1's feed. Next time JJ opens the dashboard, it's right there; the engagement tab's counters already reflect Brian's earlier card-expands and photo views from the tracking beacon.</li>
   </ol>

@@ -7,7 +7,8 @@ import {
   publishEvents,
   requireSearchAccess
 } from "@jj/lambda-kit";
-import { ApiError, EVENT_SOURCES, type Search } from "@jj/shared";
+import { ApiError, EVENT_SOURCES, inviteSchema, type Search } from "@jj/shared";
+import { ensureCustomerUser } from "../cognito.js";
 import * as repo from "../repo.js";
 
 const searchIdPath = z.object({ searchId: z.string().ulid() });
@@ -66,6 +67,89 @@ export const handler = dispatch({
         });
       }
       return { body: { search: searchLite(search), brief, role, prevSeenAt } };
+    }
+  }),
+
+  /** Who has access to this search — shown in the client's invite overlay. */
+  "GET /api/v1/searches/{searchId}/members": apiHandler({
+    path: searchIdPath,
+    fn: async ({ path, event }) => {
+      const auth = customerAuth(event);
+      requireSearchAccess(auth, path.searchId);
+      const members = await repo.listMembers(path.searchId);
+      return {
+        body: {
+          items: members
+            .sort((a, b) => a.invitedAt.localeCompare(b.invitedAt))
+            .map((m) => ({
+              userId: m.userId,
+              displayName: m.displayName,
+              email: m.email,
+              role: m.role,
+              invitedAt: m.invitedAt,
+              lastSeenAt: m.lastSeenAt
+            }))
+        }
+      };
+    }
+  }),
+
+  /**
+   * A client with edit access invites someone to their own search, as a
+   * viewer or with edit access. Mirrors the admin invite: Cognito emails a
+   * temporary password to new accounts; existing accounts just gain access.
+   */
+  "POST /api/v1/searches/{searchId}/members": apiHandler({
+    path: searchIdPath,
+    body: inviteSchema,
+    fn: async ({ path, body, event }) => {
+      const auth = customerAuth(event);
+      const role = requireSearchAccess(auth, path.searchId);
+      if (role !== "client") {
+        throw ApiError.forbidden("Only members with edit access can invite others");
+      }
+      const search = await repo.getSearch(path.searchId);
+      if (!search) throw ApiError.notFound("Search");
+      if (search.status !== "active") {
+        throw ApiError.conflict("This search is archived");
+      }
+      const email = body.email.trim().toLowerCase();
+      if (email === auth.email.toLowerCase()) {
+        throw ApiError.conflict("You already have access to this search");
+      }
+      const { userId, created } = await ensureCustomerUser(email, body.displayName);
+      if (await repo.getMember(path.searchId, userId)) {
+        throw ApiError.conflict(`${email} already has access to this search`);
+      }
+      const now = nowIso();
+      const member = repo.buildMember({
+        searchId: path.searchId,
+        userId,
+        email,
+        displayName: body.displayName,
+        role: body.role,
+        now
+      });
+      await repo.putMember(member);
+      await publishEvents(EVENT_SOURCES.search, {
+        type: "member.invited",
+        searchId: path.searchId,
+        actorId: auth.userId,
+        actorName: auth.displayName,
+        actorRole: role,
+        at: now,
+        summary: `${auth.displayName} invited ${body.displayName} (${email}) with ${
+          body.role === "client" ? "edit" : "view-only"
+        } access`,
+        payload: {
+          userId,
+          email,
+          displayName: body.displayName,
+          role: body.role,
+          accountCreated: created
+        }
+      });
+      return { status: 201, body: { ...member, accountCreated: created } };
     }
   })
 });

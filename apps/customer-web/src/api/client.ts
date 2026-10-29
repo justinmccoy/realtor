@@ -5,6 +5,8 @@ import type {
   CommentCreateInput,
   CustomerListing,
   HoursEntry,
+  InviteInput,
+  Member,
   MemberRole,
   Photo,
   Rating,
@@ -99,6 +101,12 @@ export const api = {
     call<Comment>(`/searches/${sid}/comments`, { method: "POST", body }),
   hours: (sid: string) =>
     call<{ items: HoursEntry[] }>(`/searches/${sid}/hours?limit=500`),
+  members: (sid: string) => call<{ items: Member[] }>(`/searches/${sid}/members`),
+  invite: (sid: string, body: InviteInput) =>
+    call<Member & { accountCreated: boolean }>(`/searches/${sid}/members`, {
+      method: "POST",
+      body
+    }),
   postEvents: (body: ClientEventsBatch) =>
     call<{ accepted: number }>("/activity/events", {
       method: "POST",

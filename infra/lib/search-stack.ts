@@ -60,10 +60,19 @@ export class SearchStack extends Stack {
       serviceName: "search-customer",
       entry: "services/search/src/handlers/customer.ts",
       description: "Search service: customer routes",
-      environment: common
+      environment: {
+        ...common,
+        CUSTOMER_POOL_ID: props.customerPool.userPoolId
+      }
     }).fn;
-    table.grantReadWriteData(customerFn); // reads + lastSeen touch
+    table.grantReadWriteData(customerFn); // reads, lastSeen touch, client invites
     bus.grantPutEventsTo(customerFn);
+    customerFn.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ["cognito-idp:AdminCreateUser", "cognito-idp:AdminGetUser"],
+        resources: [props.customerPool.userPoolArn]
+      })
+    );
     addFunctionAlarms(this, "Customer", customerFn, props.alarmTopic);
 
     // Email notifications: this service owns member emails, so it sends.
@@ -92,8 +101,13 @@ export class SearchStack extends Stack {
     new events.Rule(this, "NotifyEvents", {
       eventBus: bus,
       eventPattern: {
-        source: ["jj.listing", "jj.engagement"],
-        detailType: ["listing.shared", "comment.created", "rating.saved"]
+        source: ["jj.listing", "jj.engagement", "jj.search"],
+        detailType: [
+          "listing.shared",
+          "comment.created",
+          "rating.saved",
+          "member.invited"
+        ]
       },
       targets: [new targets.LambdaFunction(notifyFn, { retryAttempts: 2 })]
     });
@@ -148,6 +162,12 @@ export class SearchStack extends Stack {
     httpApi.addRoutes({
       path: "/api/v1/searches/{searchId}",
       methods: [HttpMethod.GET],
+      integration: customerInt,
+      authorizer: customerAuthorizer
+    });
+    httpApi.addRoutes({
+      path: "/api/v1/searches/{searchId}/members",
+      methods: [HttpMethod.GET, HttpMethod.POST],
       integration: customerInt,
       authorizer: customerAuthorizer
     });

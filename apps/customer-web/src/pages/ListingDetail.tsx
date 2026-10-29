@@ -413,6 +413,7 @@ export function ListingDetail({
             comments={comments}
             onChanged={onCommentsChanged}
             placeholder="Ask or note something about this apartment…"
+            canComment={canRate}
           />
         </aside>
       </div>

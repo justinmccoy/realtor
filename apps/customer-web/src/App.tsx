@@ -11,10 +11,11 @@ import { UserMenu } from "./components/UserMenu";
 import { BriefPanel } from "./components/Brief";
 import { SkeletonBoard } from "./components/Skeleton";
 import { HoursPanel } from "./components/HoursPanel";
+import { InvitePanel } from "./components/InvitePanel";
 import { ListingCard } from "./components/ListingCard";
 import { Summary } from "./components/Summary";
 import { configOk } from "./config";
-import { allMapUrl, sortCards } from "./lib/fit";
+import { sortCards } from "./lib/fit";
 import { ListingDetail } from "./pages/ListingDetail";
 import { Login } from "./pages/Login";
 import { initTracking, track } from "./tracking";
@@ -33,6 +34,7 @@ export default function App() {
   const [searchId, setSearchId] = useState<string | null>(null);
   const [billingOpen, setBillingOpen] = useState(false);
   const [briefOpen, setBriefOpen] = useState(false);
+  const [inviteOpen, setInviteOpen] = useState(false);
   const [filter, setFilter] = useState<Filter>("all");
   const [sort, setSortState] = useState<Sort>(
     () => (localStorage.getItem("jj-sort") as Sort) || "new"
@@ -122,6 +124,15 @@ export default function App() {
   }, [briefOpen]);
 
   useEffect(() => {
+    if (!inviteOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setInviteOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [inviteOpen]);
+
+  useEffect(() => {
     if (!zoom) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setZoom(null);
@@ -190,7 +201,6 @@ export default function App() {
   }
   const filtered = listings.filter((l) => filter === "all" || l.status === filter);
   const cards = sortCards(filtered, sort, avgScore);
-  const mapAll = allMapUrl(listings);
   const photosFor = (id: string) =>
     data.photos
       .filter((p) => p.listingId === id)
@@ -203,6 +213,7 @@ export default function App() {
       <Header
         clientName={data.clientName}
         onOpenBrief={() => setBriefOpen(true)}
+        onOpenInvite={() => setInviteOpen(true)}
         onOpenBilling={() => setBillingOpen(true)}
       />
 
@@ -269,17 +280,6 @@ export default function App() {
                   ))}
               </div>
               <div className="tool-right">
-                {mapAll && (
-                  <a
-                    className="btn"
-                    href={mapAll}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={() => track("map_clicked")}
-                  >
-                    All on Google Maps ↗
-                  </a>
-                )}
                 <label className="note-line" htmlFor="sort">
                   Sort
                 </label>
@@ -346,6 +346,35 @@ export default function App() {
               </button>
             </div>
             <BriefPanel brief={data.brief} settings={data.settings} />
+          </div>
+        </div>
+      )}
+
+      {inviteOpen && (
+        <div
+          className="modal"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setInviteOpen(false);
+          }}
+        >
+          <div
+            className="sheet"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Invite someone to this search"
+          >
+            <div className="sheet-h">
+              <h2>Share this search</h2>
+              <button className="btn" type="button" onClick={() => setInviteOpen(false)}>
+                Close
+              </button>
+            </div>
+            <InvitePanel
+              key={searchId}
+              searchId={searchId}
+              myEmail={auth.email}
+              canInvite={data.role === "client"}
+            />
           </div>
         </div>
       )}
@@ -422,14 +451,17 @@ export default function App() {
 function Header({
   clientName,
   onOpenBrief,
+  onOpenInvite,
   onOpenBilling
 }: {
   clientName: string | null;
   onOpenBrief?: () => void;
+  onOpenInvite?: () => void;
   onOpenBilling?: () => void;
 }) {
   const items = [
     ...(onOpenBrief ? [{ label: "Search requirements", onClick: onOpenBrief }] : []),
+    ...(onOpenInvite ? [{ label: "Invite someone…", onClick: onOpenInvite }] : []),
     ...(onOpenBilling ? [{ label: "Billing", onClick: onOpenBilling }] : [])
   ];
   const auth = useAuth();

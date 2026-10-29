@@ -363,3 +363,100 @@ img {
 .card.detail .photo {
   aspect-ratio: 16 / 10;
 }
+
+/* invite overlay */
+.invite {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.members {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.members li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+  font-size: 14px;
+}
+.members li:first-child {
+  border-top: 0;
+}
+.members .who {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 8px;
+  min-width: 0;
+}
+.members .mail {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.members .you {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-radius: 4px;
+  padding: 1px 6px;
+}
+.roles {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.roles legend {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 0;
+  margin-bottom: 6px;
+}
+.roles label {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+  cursor: pointer;
+  font-size: 14px;
+}
+.roles label:has(input:checked) {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.roles input {
+  accent-color: var(--accent);
+  margin-top: 3px;
+}
+.roles span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.roles small {
+  color: var(--muted);
+  font-size: 12px;
+}
+@media (max-width: 520px) {
+  .roles,
+  .invite .two {
+    grid-template-columns: 1fr;
+  }
+}

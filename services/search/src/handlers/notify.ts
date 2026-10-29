@@ -12,6 +12,9 @@ import { sendMail } from "../mailer.js";
  *   comment.created (by admin)     → members of that search
  *   comment.created (by client)    → the admin
  *   rating.saved                   → the admin
+ *   member.invited (by client)     → the admin, plus the invitee when their
+ *                                    account already existed (new accounts
+ *                                    get Cognito's temporary-password mail)
  *
  * Notes: auto-matched listings don't notify (no explicit admin intent);
  * actors never get notified about their own action.
@@ -76,6 +79,23 @@ export const handler: EventBridgeHandler<string, DomainEvent, void> = async (
         await notifyAdmin("New rating from your client", d.summary);
       }
       break;
+    case "member.invited": {
+      if (d.actorRole === "admin") break;
+      await notifyAdmin("Your client invited someone to their search", d.summary);
+      const p = d.payload as
+        | { email?: string; displayName?: string; accountCreated?: boolean }
+        | undefined;
+      if (p?.email && p.accountCreated === false) {
+        await sendMail({
+          to: [p.email],
+          subject: "You've been added to an apartment search",
+          body: `${d.actorName ?? "A client"} added you to ${clientName}'s Berlin apartment search. Sign in with your existing account to see it.`,
+          link: customerUrl || undefined,
+          linkLabel: "Open the apartment search"
+        });
+      }
+      break;
+    }
     default:
       logger.debug("ignoring event", { type: event["detail-type"] });
   }

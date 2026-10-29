@@ -215,7 +215,7 @@ export function Clients({
           </Field>
         </div>
         <div className="three">
-          <Field label="Role" hint="Viewers comment but can't save star ratings">
+          <Field label="Role" hint="Clients rate and comment; viewers are read-only">
             <select
               className="inline"
               value={role}

@@ -147,7 +147,9 @@ To import the real data from the original prototype: export its data store
 (gitignored).
 
 Then invite the client in the admin app (Search → Members) — Cognito emails
-them a temporary password for the **customer** site.
+them a temporary password for the **customer** site. Clients with the
+`client` role can then invite more people themselves from the user menu
+("Invite someone…"), with edit (`client`) or view-only (`viewer`) access.
 
 ## CI/CD (GitHub Actions)
 
