@@ -1,4 +1,33 @@
-import { useRef, useState, type ReactNode } from "react";
+import { Component, useRef, useState, type ReactNode } from "react";
+
+/** Any render crash shows a message + reload instead of a white screen. */
+export class ErrorBoundary extends Component<
+  { children: ReactNode },
+  { error: Error | null }
+> {
+  override state = { error: null as Error | null };
+
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+
+  override render() {
+    if (this.state.error) {
+      return (
+        <div className="fatal">
+          <p>Something broke in the admin UI.</p>
+          <p style={{ fontFamily: "monospace", fontSize: 13 }}>
+            {this.state.error.message}
+          </p>
+          <button className="btn" type="button" onClick={() => location.reload()}>
+            Reload
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 /** Two-click arming delete button, ported from the artifact. */
 export function DangerButton({

@@ -182,6 +182,15 @@ export default function App() {
           <SearchOverview
             detail={detail}
             onChanged={() => void loadSearches().then(() => loadDetail())}
+            onDeleted={() => {
+              // The shown search is gone: clear the sticky selection, land on
+              // the dashboard, and let the refreshed list pick what's next.
+              localStorage.removeItem("jj-admin-search");
+              setDetail(null);
+              setSearchId(null);
+              setPage("dashboard");
+              void loadSearches();
+            }}
             toast={toast}
           />
         ) : (

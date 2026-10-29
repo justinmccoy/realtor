@@ -7,10 +7,12 @@ import { DangerButton, Field } from "../components/ui";
 export function SearchOverview({
   detail,
   onChanged,
+  onDeleted,
   toast
 }: {
   detail: SearchDetail;
   onChanged: () => void;
+  onDeleted: () => void;
   toast: (m: string) => void;
 }) {
   const { search, brief } = detail;
@@ -119,8 +121,8 @@ export function SearchOverview({
               label="Delete search permanently"
               onConfirm={() =>
                 void api.deleteSearch(search.id).then(() => {
-                  toast("Search deleted");
-                  onChanged();
+                  toast(`Deleted ${search.clientName}'s search`);
+                  onDeleted();
                 })
               }
             />
