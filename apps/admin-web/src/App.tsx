@@ -103,22 +103,21 @@ export default function App() {
           </h1>
         </div>
         <div className="head-actions">
-          <select
-            className="inline"
-            value={searchId ?? ""}
-            onChange={(e) => setSearchId(e.target.value || null)}
-          >
-            {searches.length === 0 && <option value="">No searches yet</option>}
-            {searches.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.clientName}
-                {s.status === "archived" ? " (archived)" : ""}
-              </option>
-            ))}
-          </select>
-          <button className="btn" type="button" onClick={() => setCreating(true)}>
-            + New search
-          </button>
+          {current && (
+            <button
+              className="plate"
+              type="button"
+              title="Open this search's settings"
+              style={{ cursor: "pointer", background: "none" }}
+              onClick={() => setPage("overview")}
+            >
+              <span className="pn">⌂</span>
+              <span className="pb">
+                {current.clientName}
+                {current.status === "archived" ? " (archived)" : ""}
+              </span>
+            </button>
+          )}
           <span className="note-line">{auth.name || auth.email}</span>
           <button
             className="btn ghost"
@@ -204,6 +203,32 @@ export default function App() {
       )}
       {page === "clients" && (
         <Clients searches={searches} onChanged={() => void loadSearches()} />
+      )}
+      {page === "overview" && (
+        <div className="page-h">
+          <div className="filters">
+            <label className="note-line" htmlFor="search-select">
+              Working on
+            </label>
+            <select
+              id="search-select"
+              className="inline"
+              value={searchId ?? ""}
+              onChange={(e) => setSearchId(e.target.value || null)}
+            >
+              {searches.length === 0 && <option value="">No searches yet</option>}
+              {searches.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.clientName}
+                  {s.status === "archived" ? " (archived)" : ""}
+                </option>
+              ))}
+            </select>
+          </div>
+          <button className="btn primary" type="button" onClick={() => setCreating(true)}>
+            + New search
+          </button>
+        </div>
       )}
       {page === "overview" &&
         (detail ? (
