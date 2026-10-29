@@ -105,21 +105,20 @@ export default function App() {
           </h1>
         </div>
         <div className="head-actions">
-          {current && (
-            <button
-              className="plate"
-              type="button"
-              title="Open this search's settings"
-              style={{ cursor: "pointer", background: "none" }}
-              onClick={() => setPage("overview")}
-            >
-              <span className="pn">⌂</span>
-              <span className="pb">
-                {current.clientName}
-                {current.status === "archived" ? " (archived)" : ""}
-              </span>
-            </button>
-          )}
+          <select
+            className="inline"
+            aria-label="Active search"
+            value={searchId ?? ""}
+            onChange={(e) => setSearchId(e.target.value || null)}
+          >
+            {searches.length === 0 && <option value="">No searches yet</option>}
+            {searches.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.clientName}
+                {s.status === "archived" ? " (archived)" : ""}
+              </option>
+            ))}
+          </select>
           <UserMenu
             name={auth.name}
             email={auth.email}
@@ -206,25 +205,7 @@ export default function App() {
       )}
       {page === "overview" && (
         <div className="page-h">
-          <div className="filters">
-            <label className="note-line" htmlFor="search-select">
-              Working on
-            </label>
-            <select
-              id="search-select"
-              className="inline"
-              value={searchId ?? ""}
-              onChange={(e) => setSearchId(e.target.value || null)}
-            >
-              {searches.length === 0 && <option value="">No searches yet</option>}
-              {searches.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.clientName}
-                  {s.status === "archived" ? " (archived)" : ""}
-                </option>
-              ))}
-            </select>
-          </div>
+          <h2>{current ? `${current.clientName}'s search` : "Search"}</h2>
           <button className="btn primary" type="button" onClick={() => setCreating(true)}>
             + New search
           </button>
