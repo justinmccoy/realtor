@@ -4,12 +4,15 @@ export function UserMenu({
   name,
   email,
   onSignOut,
-  changePassword
+  changePassword,
+  items = []
 }: {
   name: string;
   email: string;
   onSignOut: () => void;
   changePassword: (oldPassword: string, newPassword: string) => Promise<void>;
+  /** Extra app-specific entries shown above the account actions. */
+  items?: { label: string; onClick: () => void }[];
 }) {
   const [open, setOpen] = useState(false);
   const [pwOpen, setPwOpen] = useState(false);
@@ -52,6 +55,19 @@ export function UserMenu({
               <b>{name}</b>
             </div>
             <div className="usermenu-row note-line">{email}</div>
+            {items.map((item) => (
+              <button
+                key={item.label}
+                className="btn"
+                type="button"
+                onClick={() => {
+                  setOpen(false);
+                  item.onClick();
+                }}
+              >
+                {item.label}
+              </button>
+            ))}
             {!pwOpen ? (
               <button
                 className="btn"

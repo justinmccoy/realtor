@@ -23,14 +23,16 @@ import { useSearchData } from "./useSearchData";
 
 type Filter = "all" | ListingStatus;
 type Sort = "new" | "score" | "price" | "sqm";
-type Tab = "listings" | "hours";
+type Tab = "listings" | "billing";
 
 export default function App() {
   const auth = useAuth();
   const [searches, setSearches] = useState<SearchLite[] | null>(null);
   const [searchId, setSearchId] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>(
-    location.hash === "#hours" ? "hours" : "listings"
+    location.hash === "#billing" || location.hash === "#hours"
+      ? "billing"
+      : "listings"
   );
   const [filter, setFilter] = useState<Filter>("all");
   const [sort, setSortState] = useState<Sort>(
@@ -86,7 +88,7 @@ export default function App() {
     // stale app state, and an incoming #listing-<id> deep link must survive
     // the sign-in roundtrip untouched.
     if (auth.status !== "signedIn") return;
-    if (tab === "hours") track("hours_viewed");
+    if (tab === "billing") track("hours_viewed");
     if (tab === "listings" && /^#listing-/.test(location.hash)) return;
     try {
       history.replaceState(null, "", `#${tab}`);
@@ -190,7 +192,7 @@ export default function App() {
 
   return (
     <div className="wrap">
-      <Header clientName={data.clientName} />
+      <Header clientName={data.clientName} onOpenBilling={() => setTab("billing")} />
 
       {searches.length > 1 && (
         <div className="picker">
@@ -218,15 +220,11 @@ export default function App() {
         >
           Listings <span className="c">{listings.length || ""}</span>
         </button>
-        <button
-          className="tab"
-          role="tab"
-          aria-selected={tab === "hours"}
-          type="button"
-          onClick={() => setTab("hours")}
-        >
-          Hours
-        </button>
+        {tab === "billing" && (
+          <button className="tab" role="tab" aria-selected type="button">
+            Billing
+          </button>
+        )}
       </nav>
 
       {tab === "listings" ? (
@@ -404,7 +402,13 @@ export default function App() {
   );
 }
 
-function Header({ clientName }: { clientName: string | null }) {
+function Header({
+  clientName,
+  onOpenBilling
+}: {
+  clientName: string | null;
+  onOpenBilling?: () => void;
+}) {
   const auth = useAuth();
   return (
     <header>
@@ -420,6 +424,7 @@ function Header({ clientName }: { clientName: string | null }) {
         <UserMenu
           name={auth.name}
           email={auth.email}
+          items={onOpenBilling ? [{ label: "Billing", onClick: onOpenBilling }] : []}
           changePassword={changePassword}
           onSignOut={() => {
             auth.signOut();

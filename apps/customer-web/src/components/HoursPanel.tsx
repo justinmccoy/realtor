@@ -26,7 +26,7 @@ export function HoursPanel({
   if (!hours.length) {
     return (
       <div className="panel">
-        <h2>Hours ledger</h2>
+        <h2>Billing</h2>
         <div className="empty">
           <h3>No time logged yet</h3>
           <p>Logged work will show here, grouped by month.</p>
@@ -53,7 +53,7 @@ export function HoursPanel({
   return (
     <div className="panel">
       <div className="ledger-h">
-        <h2>Hours ledger</h2>
+        <h2>Billing</h2>
         {rate > 0 && <span className="rate">{eur(rate)} / hour</span>}
       </div>
       <div className="totals">
