@@ -120,7 +120,18 @@ export default function App() {
             + New search
           </button>
           <span className="note-line">{auth.name || auth.email}</span>
-          <button className="btn ghost" type="button" onClick={auth.signOut}>
+          <button
+            className="btn ghost"
+            type="button"
+            onClick={() => {
+              auth.signOut();
+              try {
+                history.replaceState(null, "", location.pathname + location.search);
+              } catch {
+                /* ignore */
+              }
+            }}
+          >
             Sign out
           </button>
         </div>
