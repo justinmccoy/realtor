@@ -23,16 +23,14 @@ import { useSearchData } from "./useSearchData";
 
 type Filter = "all" | ListingStatus;
 type Sort = "new" | "score" | "price" | "sqm";
-type Tab = "listings" | "billing";
 
 export default function App() {
   const auth = useAuth();
   const [searches, setSearches] = useState<SearchLite[] | null>(null);
   const [searchId, setSearchId] = useState<string | null>(null);
-  const [tab, setTab] = useState<Tab>(
+  // Legacy #billing/#hours links open the popup once, then the hash clears.
+  const [billingOpen, setBillingOpen] = useState<boolean>(
     location.hash === "#billing" || location.hash === "#hours"
-      ? "billing"
-      : "listings"
   );
   const [filter, setFilter] = useState<Filter>("all");
   const [sort, setSortState] = useState<Sort>(
@@ -84,18 +82,22 @@ export default function App() {
   }, [data?.listings.length]);
 
   useEffect(() => {
-    // Only manage the hash while signed in — the login page must not carry
-    // stale app state, and an incoming #listing-<id> deep link must survive
-    // the sign-in roundtrip untouched.
-    if (auth.status !== "signedIn") return;
-    if (tab === "billing") track("hours_viewed");
-    if (tab === "listings" && /^#listing-/.test(location.hash)) return;
-    try {
-      history.replaceState(null, "", `#${tab}`);
-    } catch {
-      /* ignore */
+    if (!billingOpen) return;
+    track("hours_viewed");
+    // Clear a legacy #billing/#hours hash; Esc closes the popup.
+    if (/^#(billing|hours)$/.test(location.hash)) {
+      try {
+        history.replaceState(null, "", location.pathname + location.search);
+      } catch {
+        /* ignore */
+      }
     }
-  }, [tab, auth.status]);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setBillingOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [billingOpen]);
 
   useEffect(() => {
     if (!zoom) return;
@@ -192,7 +194,7 @@ export default function App() {
 
   return (
     <div className="wrap">
-      <Header clientName={data.clientName} onOpenBilling={() => setTab("billing")} />
+      <Header clientName={data.clientName} onOpenBilling={() => setBillingOpen(true)} />
 
       {searches.length > 1 && (
         <div className="picker">
@@ -211,23 +213,12 @@ export default function App() {
       )}
 
       <nav className="tabs" role="tablist">
-        <button
-          className="tab"
-          role="tab"
-          aria-selected={tab === "listings"}
-          type="button"
-          onClick={() => setTab("listings")}
-        >
+        <button className="tab" role="tab" aria-selected type="button">
           Listings <span className="c">{listings.length || ""}</span>
         </button>
-        {tab === "billing" && (
-          <button className="tab" role="tab" aria-selected type="button">
-            Billing
-          </button>
-        )}
       </nav>
 
-      {tab === "listings" ? (
+      {(
         <section style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <BriefPanel brief={data.brief} settings={data.settings} />
           <Summary listings={listings} />
@@ -348,10 +339,27 @@ export default function App() {
             />
           </section>
         </section>
-      ) : (
-        <section className="hours-layout" style={{ gridTemplateColumns: "1fr" }}>
-          <HoursPanel hours={data.hours} settings={data.settings} listings={listings} />
-        </section>
+      )}
+
+      {billingOpen && (
+        <div
+          className="modal"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setBillingOpen(false);
+          }}
+        >
+          <div
+            className="sheet"
+            style={{ maxWidth: 880, padding: 0, border: "none", background: "none" }}
+          >
+            <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+              <button className="btn" type="button" onClick={() => setBillingOpen(false)}>
+                Close
+              </button>
+            </div>
+            <HoursPanel hours={data.hours} settings={data.settings} listings={listings} />
+          </div>
+        </div>
       )}
 
       {zoom && (
