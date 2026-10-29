@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import type { Search } from "@jj/shared";
 import { api, type SearchDetail } from "./api/client";
 import { useAuth } from "./auth/AuthContext";
+import { changePassword } from "./auth/cognito";
+import { applyTheme, storedTheme, UserMenu } from "./components/UserMenu";
 import { Field, Modal, useToast } from "./components/ui";
 import { configOk } from "./config";
 import { Audit } from "./pages/Audit";
@@ -21,6 +23,8 @@ type Page =
   | "hours"
   | "engagement"
   | "audit";
+
+applyTheme(storedTheme());
 
 export default function App() {
   const auth = useAuth();
@@ -118,11 +122,11 @@ export default function App() {
               </span>
             </button>
           )}
-          <span className="note-line">{auth.name || auth.email}</span>
-          <button
-            className="btn ghost"
-            type="button"
-            onClick={() => {
+          <UserMenu
+            name={auth.name}
+            email={auth.email}
+            changePassword={changePassword}
+            onSignOut={() => {
               auth.signOut();
               try {
                 history.replaceState(null, "", location.pathname + location.search);
@@ -130,9 +134,7 @@ export default function App() {
                 /* ignore */
               }
             }}
-          >
-            Sign out
-          </button>
+          />
         </div>
       </header>
 

@@ -163,6 +163,24 @@ export function currentAccessToken(): Promise<string | null> {
   return restoreSession().then((s) => s?.accessToken ?? null);
 }
 
+
+/** Change the signed-in user's password (requires the current one). */
+export function changePassword(
+  oldPassword: string,
+  newPassword: string
+): Promise<void> {
+  const user = pool.getCurrentUser();
+  if (!user) return Promise.reject(new Error("Not signed in"));
+  return new Promise((resolve, reject) => {
+    user.getSession((err: Error | null) => {
+      if (err) return reject(err);
+      user.changePassword(oldPassword, newPassword, (e) =>
+        e ? reject(e) : resolve()
+      );
+    });
+  });
+}
+
 export function signOut(): void {
   pool.getCurrentUser()?.signOut();
 }

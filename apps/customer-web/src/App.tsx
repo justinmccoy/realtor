@@ -6,6 +6,8 @@ import {
 } from "@jj/shared";
 import { api, type SearchLite } from "./api/client";
 import { useAuth } from "./auth/AuthContext";
+import { changePassword } from "./auth/cognito";
+import { applyTheme, storedTheme, UserMenu } from "./components/UserMenu";
 import { BriefPanel } from "./components/Brief";
 import { SkeletonBoard } from "./components/Skeleton";
 import { CommentThread } from "./components/Comments";
@@ -22,6 +24,8 @@ import { useSearchData } from "./useSearchData";
 type Filter = "all" | ListingStatus;
 type Sort = "new" | "score" | "price" | "sqm";
 type Tab = "listings" | "hours";
+
+applyTheme(storedTheme());
 
 export default function App() {
   const auth = useAuth();
@@ -415,11 +419,11 @@ function Header({ clientName }: { clientName: string | null }) {
         </h1>
       </div>
       <div className="head-actions">
-        <span className="note-line">{auth.name || auth.email}</span>
-        <button
-          className="btn ghost"
-          type="button"
-          onClick={() => {
+        <UserMenu
+          name={auth.name}
+          email={auth.email}
+          changePassword={changePassword}
+          onSignOut={() => {
             auth.signOut();
             try {
               history.replaceState(null, "", location.pathname + location.search);
@@ -427,9 +431,7 @@ function Header({ clientName }: { clientName: string | null }) {
               /* ignore */
             }
           }}
-        >
-          Sign out
-        </button>
+        />
       </div>
     </header>
   );
