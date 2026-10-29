@@ -94,7 +94,19 @@ export interface AuditItem {
   after: string | null;
 }
 
+export interface CustomerAccount {
+  userId: string;
+  email: string;
+  name: string;
+  status: string;
+  enabled: boolean;
+  createdAt: string | null;
+}
+
 export const api = {
+  /* customer accounts (whole pool: self-registered + invited) */
+  users: () => call<{ items: CustomerAccount[] }>("/admin/users"),
+
   /* searches */
   searches: (cursor?: string) =>
     call<{ items: Search[]; nextCursor: string | null }>(

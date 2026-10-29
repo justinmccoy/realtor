@@ -2,8 +2,10 @@ import {
   AdminCreateUserCommand,
   AdminGetUserCommand,
   CognitoIdentityProviderClient,
+  ListUsersCommand,
   UsernameExistsException,
-  type AttributeType
+  type AttributeType,
+  type UserType
 } from "@aws-sdk/client-cognito-identity-provider";
 import { ApiError } from "@jj/shared";
 import { logger } from "@jj/lambda-kit";
@@ -12,6 +14,66 @@ let client: CognitoIdentityProviderClient | undefined;
 function cognito(): CognitoIdentityProviderClient {
   if (!client) client = new CognitoIdentityProviderClient({});
   return client;
+}
+
+export interface CustomerAccount {
+  userId: string;
+  email: string;
+  name: string;
+  /** confirmed | temp-password | unconfirmed | <other Cognito status> */
+  status: string;
+  enabled: boolean;
+  createdAt: string | null;
+}
+
+/** Pure mapping from a Cognito user record (unit-tested). */
+export function toCustomerAccount(user: UserType): CustomerAccount | null {
+  const attr = (name: string) =>
+    user.Attributes?.find((a) => a.Name === name)?.Value;
+  const userId = attr("sub");
+  if (!userId) return null;
+  const status =
+    user.UserStatus === "CONFIRMED"
+      ? "confirmed"
+      : user.UserStatus === "FORCE_CHANGE_PASSWORD"
+        ? "temp-password"
+        : user.UserStatus === "UNCONFIRMED"
+          ? "unconfirmed"
+          : (user.UserStatus ?? "unknown").toLowerCase();
+  return {
+    userId,
+    email: attr("email") ?? user.Username ?? "",
+    name: attr("name") ?? "",
+    status,
+    enabled: user.Enabled ?? true,
+    createdAt: user.UserCreateDate?.toISOString() ?? null
+  };
+}
+
+/** Every account in the customer pool (registered or invited), newest first. */
+export async function listCustomerUsers(): Promise<CustomerAccount[]> {
+  const poolId = process.env.CUSTOMER_POOL_ID;
+  if (!poolId) throw new ApiError(500, "internal", "CUSTOMER_POOL_ID not set");
+  const accounts: CustomerAccount[] = [];
+  let paginationToken: string | undefined;
+  for (let page = 0; page < 20; page++) {
+    const res = await cognito().send(
+      new ListUsersCommand({
+        UserPoolId: poolId,
+        Limit: 60,
+        PaginationToken: paginationToken
+      })
+    );
+    for (const user of res.Users ?? []) {
+      const account = toCustomerAccount(user);
+      if (account) accounts.push(account);
+    }
+    paginationToken = res.PaginationToken;
+    if (!paginationToken) break;
+  }
+  return accounts.sort((a, b) =>
+    (b.createdAt ?? "").localeCompare(a.createdAt ?? "")
+  );
 }
 
 function sub(attrs: AttributeType[] | undefined): string {

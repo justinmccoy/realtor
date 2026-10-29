@@ -6,7 +6,7 @@ import {
   type MemberRole,
   type Search
 } from "@jj/shared";
-import { api } from "../api/client";
+import { api, type CustomerAccount } from "../api/client";
 import { fmtWhen } from "../lib/format";
 import { DangerButton, Field, useToast } from "../components/ui";
 
@@ -29,6 +29,7 @@ export function Clients({
   onChanged: () => void;
 }) {
   const [rows, setRows] = useState<ClientRow[] | null>(null);
+  const [accounts, setAccounts] = useState<CustomerAccount[] | null>(null);
   const [loadError, setLoadError] = useState("");
   const [partial, setPartial] = useState("");
   const [toastEl, toast] = useToast();
@@ -123,6 +124,13 @@ export function Clients({
     void load();
   }, [load]);
 
+  useEffect(() => {
+    api
+      .users()
+      .then((r) => setAccounts(r.items))
+      .catch(() => setAccounts([]));
+  }, []);
+
   /* invite form */
   const [sid, setSid] = useState("");
   const [email, setEmail] = useState("");
@@ -157,6 +165,22 @@ export function Clients({
 
   const quiet = (iso: string | null) =>
     !iso || Date.now() - new Date(iso).getTime() > 7 * 86_400_000;
+
+  const membershipsOf = (userId: string) =>
+    (rows ?? []).filter((r) => r.member.userId === userId);
+
+  const prefillInvite = (account: CustomerAccount) => {
+    setEmail(account.email);
+    setName(account.name || account.email.split("@")[0] || "");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    toast("Invite form pre-filled — pick the search and hit Invite");
+  };
+
+  const ACCOUNT_STATUS: Record<string, string> = {
+    confirmed: "active",
+    "temp-password": "invited — temp password not used yet",
+    unconfirmed: "registered — email not confirmed"
+  };
 
   return (
     <section style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -305,6 +329,72 @@ export function Clients({
           </table>
         </div>
       )}
+      <section className="panel">
+        <h2 style={{ fontSize: 20 }}>Registered accounts</h2>
+        <p className="note-line" style={{ margin: 0 }}>
+          Everyone with a login on the customer site — including people who
+          self-registered and aren't attached to any search yet.
+        </p>
+        {accounts === null ? (
+          <p className="note-line">Loading accounts…</p>
+        ) : accounts.length === 0 ? (
+          <p className="note-line">No accounts yet.</p>
+        ) : (
+          <div className="tbl-wrap">
+            <table className="tbl">
+              <thead>
+                <tr>
+                  <th>Account</th>
+                  <th>Status</th>
+                  <th>Registered</th>
+                  <th>Member of</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {accounts.map((a) => {
+                  const memberships = membershipsOf(a.userId);
+                  return (
+                    <tr key={a.userId}>
+                      <td>
+                        <b>{a.name || "—"}</b>
+                        <br />
+                        <small className="muted">{a.email}</small>
+                      </td>
+                      <td>
+                        {ACCOUNT_STATUS[a.status] ?? a.status}
+                        {!a.enabled && <span className="rmini2"> disabled</span>}
+                      </td>
+                      <td className="muted">
+                        {a.createdAt ? fmtWhen(a.createdAt) : "—"}
+                      </td>
+                      <td>
+                        {memberships.length ? (
+                          memberships.map((m) => m.search.clientName).join(", ")
+                        ) : (
+                          <span className="rmini2">no search assigned</span>
+                        )}
+                      </td>
+                      <td>
+                        <div className="row-actions">
+                          <button
+                            className="btn ghost"
+                            type="button"
+                            onClick={() => prefillInvite(a)}
+                          >
+                            {memberships.length ? "Add to another search" : "Add to a search"}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
       <p className="note-line">
         "Listings for them" = visible to this client (brief matches + manual
         shares − hides) / total pool. Removing a

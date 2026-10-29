@@ -16,7 +16,7 @@ import {
   searchCreateSchema,
   searchUpdateSchema
 } from "@jj/shared";
-import { ensureCustomerUser } from "../cognito.js";
+import { ensureCustomerUser, listCustomerUsers } from "../cognito.js";
 import * as repo from "../repo.js";
 
 const searchIdPath = z.object({ searchId: z.string().ulid() });
@@ -26,6 +26,14 @@ const memberPath = z.object({
 });
 
 export const handler = dispatch({
+  /** Every customer-pool account — self-registered or invited. */
+  "GET /api/v1/admin/users": apiHandler({
+    fn: async ({ event }) => {
+      adminAuth(event);
+      return { body: { items: await listCustomerUsers() } };
+    }
+  }),
+
   "POST /api/v1/admin/searches": apiHandler({
     body: searchCreateSchema,
     fn: async ({ body, event }) => {

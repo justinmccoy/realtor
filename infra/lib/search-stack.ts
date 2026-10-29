@@ -44,7 +44,11 @@ export class SearchStack extends Stack {
     bus.grantPutEventsTo(adminFn);
     adminFn.addToRolePolicy(
       new iam.PolicyStatement({
-        actions: ["cognito-idp:AdminCreateUser", "cognito-idp:AdminGetUser"],
+        actions: [
+          "cognito-idp:AdminCreateUser",
+          "cognito-idp:AdminGetUser",
+          "cognito-idp:ListUsers"
+        ],
         resources: [props.customerPool.userPoolArn]
       })
     );
@@ -65,6 +69,12 @@ export class SearchStack extends Stack {
     const customerInt = new HttpLambdaIntegration("CustomerInt", customerFn);
     const { httpApi, adminAuthorizer, customerAuthorizer } = routes;
 
+    httpApi.addRoutes({
+      path: "/api/v1/admin/users",
+      methods: [HttpMethod.GET],
+      integration: adminInt,
+      authorizer: adminAuthorizer
+    });
     httpApi.addRoutes({
       path: "/api/v1/admin/searches",
       methods: [HttpMethod.GET, HttpMethod.POST],
