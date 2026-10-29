@@ -28,10 +28,7 @@ export default function App() {
   const auth = useAuth();
   const [searches, setSearches] = useState<SearchLite[] | null>(null);
   const [searchId, setSearchId] = useState<string | null>(null);
-  // Legacy #billing/#hours links open the popup once, then the hash clears.
-  const [billingOpen, setBillingOpen] = useState<boolean>(
-    location.hash === "#billing" || location.hash === "#hours"
-  );
+  const [billingOpen, setBillingOpen] = useState(false);
   const [filter, setFilter] = useState<Filter>("all");
   const [sort, setSortState] = useState<Sort>(
     () => (localStorage.getItem("jj-sort") as Sort) || "new"
@@ -84,14 +81,6 @@ export default function App() {
   useEffect(() => {
     if (!billingOpen) return;
     track("hours_viewed");
-    // Clear a legacy #billing/#hours hash; Esc closes the popup.
-    if (/^#(billing|hours)$/.test(location.hash)) {
-      try {
-        history.replaceState(null, "", location.pathname + location.search);
-      } catch {
-        /* ignore */
-      }
-    }
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setBillingOpen(false);
     };
