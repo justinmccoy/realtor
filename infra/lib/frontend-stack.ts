@@ -1,4 +1,4 @@
-import { CfnOutput, Duration, Stack, type StackProps } from "aws-cdk-lib";
+import { CfnOutput, Stack, type StackProps } from "aws-cdk-lib";
 import type * as acm from "aws-cdk-lib/aws-certificatemanager";
 import * as cloudfront from "aws-cdk-lib/aws-cloudfront";
 import * as origins from "aws-cdk-lib/aws-cloudfront-origins";
@@ -55,6 +55,21 @@ export class FrontendStack extends Stack {
         autoDeleteObjects: config.envName === "dev"
       });
 
+      // SPA routing via a viewer-request rewrite on the S3 behavior only.
+      // (Distribution-wide errorResponses would also rewrite API 404s into a
+      // 200 index.html, turning any missing route into silent JSON garbage.)
+      const spaRewrite = new cloudfront.Function(this, `${name}SpaRewrite`, {
+        code: cloudfront.FunctionCode.fromInline(`
+function handler(event) {
+  var request = event.request;
+  var uri = request.uri;
+  if (uri.indexOf('.') === -1) {
+    request.uri = '/index.html';
+  }
+  return request;
+}`)
+      });
+
       const distribution = new cloudfront.Distribution(this, `${name}Dist`, {
         comment: `jj ${name}-web ${config.envName}`,
         defaultRootObject: "index.html",
@@ -63,7 +78,13 @@ export class FrontendStack extends Stack {
           viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
           cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
           responseHeadersPolicy:
-            cloudfront.ResponseHeadersPolicy.SECURITY_HEADERS
+            cloudfront.ResponseHeadersPolicy.SECURITY_HEADERS,
+          functionAssociations: [
+            {
+              function: spaRewrite,
+              eventType: cloudfront.FunctionEventType.VIEWER_REQUEST
+            }
+          ]
         },
         additionalBehaviors: {
           "/api/*": {
@@ -76,20 +97,6 @@ export class FrontendStack extends Stack {
               cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER
           }
         },
-        errorResponses: [
-          {
-            httpStatus: 403,
-            responseHttpStatus: 200,
-            responsePagePath: "/index.html",
-            ttl: Duration.minutes(5)
-          },
-          {
-            httpStatus: 404,
-            responseHttpStatus: 200,
-            responsePagePath: "/index.html",
-            ttl: Duration.minutes(5)
-          }
-        ],
         priceClass: cloudfront.PriceClass.PRICE_CLASS_100,
         webAclId: props.webAclArn,
         ...(domainName && certificate

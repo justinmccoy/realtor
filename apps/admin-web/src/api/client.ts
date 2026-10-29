@@ -53,6 +53,14 @@ async function call<T>(
     body: init.body !== undefined ? JSON.stringify(init.body) : undefined
   });
   if (res.status === 204) return undefined as T;
+  const contentType = res.headers.get("content-type") ?? "";
+  if (res.ok && !contentType.includes("application/json")) {
+    throw new ApiClientError(
+      res.status,
+      "bad_gateway",
+      `API returned ${contentType || "no content type"} instead of JSON — is the backend deploy up to date?`
+    );
+  }
   const data: unknown = await res.json().catch(() => ({}));
   if (!res.ok) {
     const err = (data as { error?: { code?: string; message?: string } }).error;
