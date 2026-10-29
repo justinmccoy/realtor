@@ -10,13 +10,12 @@ import { changePassword } from "./auth/cognito";
 import { UserMenu } from "./components/UserMenu";
 import { BriefPanel } from "./components/Brief";
 import { SkeletonBoard } from "./components/Skeleton";
-import { CommentThread } from "./components/Comments";
 import { HoursPanel } from "./components/HoursPanel";
 import { ListingCard } from "./components/ListingCard";
 import { Summary } from "./components/Summary";
-import { Top5 } from "./components/Top5";
 import { configOk } from "./config";
 import { allMapUrl, sortCards } from "./lib/fit";
+import { ListingDetail } from "./pages/ListingDetail";
 import { Login } from "./pages/Login";
 import { initTracking, track } from "./tracking";
 import { useSearchData } from "./useSearchData";
@@ -24,11 +23,16 @@ import { useSearchData } from "./useSearchData";
 type Filter = "all" | ListingStatus;
 type Sort = "new" | "score" | "price" | "sqm";
 
+/** `#listing-<id>` is the detail route; anything else is the board. */
+const listingFromHash = (): string | null =>
+  location.hash.match(/^#listing-(.+)$/)?.[1] ?? null;
+
 export default function App() {
   const auth = useAuth();
   const [searches, setSearches] = useState<SearchLite[] | null>(null);
   const [searchId, setSearchId] = useState<string | null>(null);
   const [billingOpen, setBillingOpen] = useState(false);
+  const [briefOpen, setBriefOpen] = useState(false);
   const [filter, setFilter] = useState<Filter>("all");
   const [sort, setSortState] = useState<Sort>(
     () => (localStorage.getItem("jj-sort") as Sort) || "new"
@@ -41,7 +45,7 @@ export default function App() {
       /* private mode */
     }
   };
-  const [open, setOpen] = useState<Set<string>>(new Set());
+  const [detailId, setDetailId] = useState<string | null>(listingFromHash);
   const [zoom, setZoom] = useState<{ urls: string[]; idx: number } | null>(null);
   const [loadError, setLoadError] = useState("");
 
@@ -65,18 +69,37 @@ export default function App() {
     if (searchId) initTracking(searchId);
   }, [searchId]);
 
-  // Deep link: #listing-<id> expands and scrolls to that card once loaded.
+  // Browser back/forward and pasted deep links drive the detail route.
   useEffect(() => {
-    const m = location.hash.match(/^#listing-(.+)$/);
-    if (!m || !data) return;
-    const id = m[1]!;
-    if (data.listings.some((l) => l.id === id)) {
-      setOpen((o) => new Set(o).add(id));
+    const onHash = () => setDetailId(listingFromHash());
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, []);
+
+  const openListing = (id: string) => {
+    track("listing_expanded", id);
+    location.hash = `listing-${id}`; // fires hashchange → setDetailId
+  };
+
+  const closeListing = () => {
+    const id = detailId;
+    try {
+      history.pushState(null, "", location.pathname + location.search);
+    } catch {
+      /* ignore */
+    }
+    setDetailId(null);
+    if (id) {
       requestAnimationFrame(() => {
-        document.getElementById(`card-${id}`)?.scrollIntoView({ block: "start" });
+        document.getElementById(`card-${id}`)?.scrollIntoView({ block: "center" });
       });
     }
-  }, [data?.listings.length]);
+  };
+
+  // Detail page always starts at the top; the board scrolls back to the tile.
+  useEffect(() => {
+    if (detailId) window.scrollTo(0, 0);
+  }, [detailId]);
 
   useEffect(() => {
     if (!billingOpen) return;
@@ -87,6 +110,16 @@ export default function App() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [billingOpen]);
+
+  useEffect(() => {
+    if (!briefOpen) return;
+    track("brief_viewed");
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setBriefOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [briefOpen]);
 
   useEffect(() => {
     if (!zoom) return;
@@ -158,176 +191,163 @@ export default function App() {
   const filtered = listings.filter((l) => filter === "all" || l.status === filter);
   const cards = sortCards(filtered, sort, avgScore);
   const mapAll = allMapUrl(listings);
-  const allOpen = listings.length > 0 && listings.every((l) => open.has(l.id));
   const photosFor = (id: string) =>
     data.photos
       .filter((p) => p.listingId === id)
       .sort((a, b) => a.sortOrder - b.sortOrder);
 
-  const goto = (id: string) => {
-    try {
-      history.replaceState(null, "", `#listing-${id}`);
-    } catch {
-      /* ignore */
-    }
-    setOpen((o) => new Set(o).add(id));
-    requestAnimationFrame(() => {
-      document.getElementById(`card-${id}`)?.scrollIntoView({
-        behavior: matchMedia("(prefers-reduced-motion: reduce)").matches
-          ? "auto"
-          : "smooth",
-        block: "start"
-      });
-    });
-  };
+  const detail = detailId ? listings.find((l) => l.id === detailId) : undefined;
 
   return (
     <div className="wrap">
-      <Header clientName={data.clientName} onOpenBilling={() => setBillingOpen(true)} />
+      <Header
+        clientName={data.clientName}
+        onOpenBrief={() => setBriefOpen(true)}
+        onOpenBilling={() => setBillingOpen(true)}
+      />
 
-      {searches.length > 1 && (
-        <div className="picker">
-          {searches.map((s) => (
-            <button
-              key={s.id}
-              className="chip"
-              aria-pressed={s.id === searchId}
-              type="button"
-              onClick={() => setSearchId(s.id)}
-            >
-              {s.clientName}
-            </button>
-          ))}
-        </div>
-      )}
-
-      <nav className="tabs" role="tablist">
-        <button className="tab" role="tab" aria-selected type="button">
-          Listings <span className="c">{listings.length || ""}</span>
-        </button>
-      </nav>
-
-      {(
-        <section style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <BriefPanel brief={data.brief} settings={data.settings} />
-          <Summary listings={listings} />
-          <Top5 listings={listings} settings={data.settings} onGoto={goto} />
-
-          <div className="toolbar">
-            <div className="chips">
-              {(["all", ...LISTING_STATUSES] as Filter[])
-                .filter((k) => k === "all" || counts[k])
-                .map((k) => (
-                  <button
-                    key={k}
-                    className="chip"
-                    type="button"
-                    aria-pressed={filter === k}
-                    onClick={() => setFilter(k)}
-                  >
-                    {k === "all" ? "All" : LISTING_STATUS_LABELS[k as ListingStatus]}{" "}
-                    <span className="num">{counts[k]}</span>
-                  </button>
-                ))}
-            </div>
-            <div className="tool-right">
-              {mapAll && (
-                <a
-                  className="btn"
-                  href={mapAll}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={() => track("map_clicked")}
+      {detail ? (
+        <ListingDetail
+          key={detail.id}
+          listing={detail}
+          benchmark={benchmark}
+          brief={data.brief}
+          settings={data.settings}
+          photos={photosFor(detail.id)}
+          ratings={data.ratings}
+          comments={data.comments}
+          searchId={searchId}
+          canRate={data.role === "client"}
+          isNew={newIds.has(detail.id)}
+          onBack={closeListing}
+          onZoom={(urls, idx) => setZoom({ urls, idx })}
+          onRatingsChanged={() => void refreshRatings()}
+          onCommentsChanged={() => void refreshComments()}
+        />
+      ) : (
+        <>
+          {searches.length > 1 && (
+            <div className="picker">
+              {searches.map((s) => (
+                <button
+                  key={s.id}
+                  className="chip"
+                  aria-pressed={s.id === searchId}
+                  type="button"
+                  onClick={() => setSearchId(s.id)}
                 >
-                  All on Google Maps ↗
-                </a>
-              )}
-              <button
-                className="btn"
-                type="button"
-                onClick={() =>
-                  setOpen(allOpen ? new Set() : new Set(listings.map((l) => l.id)))
-                }
-              >
-                {allOpen ? "Collapse all" : "Expand all"}
-              </button>
-              <label className="note-line" htmlFor="sort">
-                Sort
-              </label>
-              <select
-                className="inline"
-                id="sort"
-                value={sort}
-                onChange={(e) => setSort(e.target.value as Sort)}
-              >
-                <option value="new">Newest first</option>
-                <option value="score">Best rated</option>
-                <option value="price">Price, low to high</option>
-                <option value="sqm">€/m², low to high</option>
-              </select>
-            </div>
-          </div>
-
-          {newIds.size > 0 && (
-            <p className="note-line" style={{ margin: 0 }}>
-              <span className="newtag">NEW</span> {newIds.size} apartment
-              {newIds.size > 1 ? "s" : ""} added since your last visit.
-            </p>
-          )}
-          {cards.length === 0 ? (
-            <div className="empty">
-              <h3>No listings yet</h3>
-              <p>No apartments have been added yet. They'll appear here as soon as they are.</p>
-            </div>
-          ) : (
-            <div className="grid">
-              {cards.map((l) => (
-                <ListingCard
-                  key={l.id}
-                  listing={l}
-                  benchmark={benchmark}
-                  brief={data.brief}
-                  settings={data.settings}
-                  photos={photosFor(l.id)}
-                  ratings={data.ratings}
-                  comments={data.comments}
-                  searchId={searchId}
-                  canRate={data.role === "client"}
-                  isNew={newIds.has(l.id)}
-                  expanded={open.has(l.id)}
-                  onToggle={() =>
-                    setOpen((o) => {
-                      const next = new Set(o);
-                      if (next.has(l.id)) next.delete(l.id);
-                      else next.add(l.id);
-                      return next;
-                    })
-                  }
-                  onZoom={(urls, idx) => setZoom({ urls, idx })}
-                  onRatingsChanged={() => void refreshRatings()}
-                  onCommentsChanged={() => void refreshComments()}
-                />
+                  {s.clientName}
+                </button>
               ))}
             </div>
           )}
 
-          <section className="panel discuss">
-            <div className="inbox-h">
-              <h2>Discussion</h2>
+          <nav className="tabs" role="tablist">
+            <button className="tab" role="tab" aria-selected type="button">
+              Listings <span className="c">{listings.length || ""}</span>
+            </button>
+          </nav>
+
+          <section style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <Summary listings={listings} />
+
+            <div className="toolbar">
+              <div className="chips">
+                {(["all", ...LISTING_STATUSES] as Filter[])
+                  .filter((k) => k === "all" || counts[k])
+                  .map((k) => (
+                    <button
+                      key={k}
+                      className="chip"
+                      type="button"
+                      aria-pressed={filter === k}
+                      onClick={() => setFilter(k)}
+                    >
+                      {k === "all" ? "All" : LISTING_STATUS_LABELS[k as ListingStatus]}{" "}
+                      <span className="num">{counts[k]}</span>
+                    </button>
+                  ))}
+              </div>
+              <div className="tool-right">
+                {mapAll && (
+                  <a
+                    className="btn"
+                    href={mapAll}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => track("map_clicked")}
+                  >
+                    All on Google Maps ↗
+                  </a>
+                )}
+                <label className="note-line" htmlFor="sort">
+                  Sort
+                </label>
+                <select
+                  className="inline"
+                  id="sort"
+                  value={sort}
+                  onChange={(e) => setSort(e.target.value as Sort)}
+                >
+                  <option value="new">Newest first</option>
+                  <option value="score">Best rated</option>
+                  <option value="price">Price, low to high</option>
+                  <option value="sqm">€/m², low to high</option>
+                </select>
+              </div>
             </div>
-            <p className="note-line" style={{ margin: 0 }}>
-              Questions, wishes and reactions about the search as a whole. To talk
-              about one apartment, use the comments on its card.
-            </p>
-            <CommentThread
-              searchId={searchId}
-              listingId={null}
-              comments={data.comments}
-              onChanged={() => void refreshComments()}
-              placeholder="Write to JJ about the search…"
-            />
+
+            {newIds.size > 0 && (
+              <p className="note-line" style={{ margin: 0 }}>
+                <span className="newtag">NEW</span> {newIds.size} apartment
+                {newIds.size > 1 ? "s" : ""} added since your last visit.
+              </p>
+            )}
+            {cards.length === 0 ? (
+              <div className="empty">
+                <h3>No listings yet</h3>
+                <p>No apartments have been added yet. They'll appear here as soon as they are.</p>
+              </div>
+            ) : (
+              <div className="grid">
+                {cards.map((l) => (
+                  <ListingCard
+                    key={l.id}
+                    listing={l}
+                    photos={photosFor(l.id)}
+                    isNew={newIds.has(l.id)}
+                    onOpen={() => openListing(l.id)}
+                  />
+                ))}
+              </div>
+            )}
           </section>
-        </section>
+        </>
+      )}
+
+      {briefOpen && (
+        <div
+          className="modal"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setBriefOpen(false);
+          }}
+        >
+          <div
+            className="sheet"
+            style={{ maxWidth: 760 }}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Search requirements"
+          >
+            <div className="sheet-h">
+              <h2>Search requirements</h2>
+              <button className="btn" type="button" onClick={() => setBriefOpen(false)}>
+                Close
+              </button>
+            </div>
+            <BriefPanel brief={data.brief} settings={data.settings} />
+          </div>
+        </div>
       )}
 
       {billingOpen && (
@@ -401,11 +421,17 @@ export default function App() {
 
 function Header({
   clientName,
+  onOpenBrief,
   onOpenBilling
 }: {
   clientName: string | null;
+  onOpenBrief?: () => void;
   onOpenBilling?: () => void;
 }) {
+  const items = [
+    ...(onOpenBrief ? [{ label: "Search requirements", onClick: onOpenBrief }] : []),
+    ...(onOpenBilling ? [{ label: "Billing", onClick: onOpenBilling }] : [])
+  ];
   const auth = useAuth();
   return (
     <header>
@@ -421,7 +447,7 @@ function Header({
         <UserMenu
           name={auth.name}
           email={auth.email}
-          items={onOpenBilling ? [{ label: "Billing", onClick: onOpenBilling }] : []}
+          items={items}
           changePassword={changePassword}
           onSignOut={() => {
             auth.signOut();

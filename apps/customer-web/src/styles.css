@@ -284,3 +284,82 @@ img {
   gap: 8px;
   font-size: 14px;
 }
+
+/* board tiles: photos + plate + price/size, whole tile links to the detail page */
+.tile {
+  position: relative;
+}
+.tile .photo .nav {
+  z-index: 2;
+}
+.tile-link {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: auto;
+  color: inherit;
+  text-decoration: none;
+}
+.tile-link::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: var(--r);
+}
+.tile-link .size {
+  font-family: var(--f-display);
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.tile-link:focus-visible {
+  outline: none;
+}
+.tile:has(.tile-link:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* listing detail page */
+.detail-page {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.detail-nav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.detail-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 380px);
+  gap: 16px;
+  align-items: start;
+}
+@media (max-width: 900px) {
+  .detail-layout {
+    grid-template-columns: 1fr;
+  }
+}
+.card.detail {
+  width: 100%;
+  min-width: 0;
+  opacity: 1;
+}
+.detail-side {
+  position: sticky;
+  top: 16px;
+}
+@media (max-width: 900px) {
+  .detail-side {
+    position: static;
+  }
+}
+.card.detail .photo {
+  aspect-ratio: 16 / 10;
+}

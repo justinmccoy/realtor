@@ -18,10 +18,10 @@ export function SkeletonBoard() {
               <div className="sk sk-plate" />
               <div className="sk sk-pill" />
             </div>
-            <div className="sk sk-h3" />
-            <div className="sk sk-line" style={{ width: "60%" }} />
-            <div className="sk sk-price" />
-            <div className="sk sk-facts" />
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+              <div className="sk sk-price" style={{ width: "45%" }} />
+              <div className="sk sk-line" style={{ width: "22%" }} />
+            </div>
           </div>
         ))}
       </div>
