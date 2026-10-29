@@ -1,17 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
-
-export type Theme = "auto" | "light" | "dark";
-
-export function applyTheme(theme: Theme): void {
-  const root = document.documentElement;
-  if (theme === "auto") root.removeAttribute("data-theme");
-  else root.setAttribute("data-theme", theme);
-}
-
-export function storedTheme(): Theme {
-  const t = localStorage.getItem("jj-theme");
-  return t === "light" || t === "dark" ? t : "auto";
-}
+import { useState, type FormEvent } from "react";
 
 export function UserMenu({
   name,
@@ -25,23 +12,11 @@ export function UserMenu({
   changePassword: (oldPassword: string, newPassword: string) => Promise<void>;
 }) {
   const [open, setOpen] = useState(false);
-  const [theme, setTheme] = useState<Theme>(storedTheme);
   const [pwOpen, setPwOpen] = useState(false);
   const [oldPw, setOldPw] = useState("");
   const [newPw, setNewPw] = useState("");
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
-
-  useEffect(() => applyTheme(theme), [theme]);
-
-  function pickTheme(t: Theme) {
-    setTheme(t);
-    try {
-      localStorage.setItem("jj-theme", t);
-    } catch {
-      /* private mode */
-    }
-  }
 
   function submitPassword(e: FormEvent) {
     e.preventDefault();
@@ -77,22 +52,6 @@ export function UserMenu({
               <b>{name}</b>
             </div>
             <div className="usermenu-row note-line">{email}</div>
-            <div className="usermenu-row">
-              <span>Theme</span>
-              <span style={{ display: "flex", gap: 4 }}>
-                {(["auto", "light", "dark"] as Theme[]).map((t) => (
-                  <button
-                    key={t}
-                    type="button"
-                    className="chip"
-                    aria-pressed={theme === t}
-                    onClick={() => pickTheme(t)}
-                  >
-                    {t}
-                  </button>
-                ))}
-              </span>
-            </div>
             {!pwOpen ? (
               <button
                 className="btn"

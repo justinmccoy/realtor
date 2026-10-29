@@ -7,7 +7,7 @@ import {
 import { api, type SearchLite } from "./api/client";
 import { useAuth } from "./auth/AuthContext";
 import { changePassword } from "./auth/cognito";
-import { applyTheme, storedTheme, UserMenu } from "./components/UserMenu";
+import { UserMenu } from "./components/UserMenu";
 import { BriefPanel } from "./components/Brief";
 import { SkeletonBoard } from "./components/Skeleton";
 import { CommentThread } from "./components/Comments";
@@ -24,8 +24,6 @@ import { useSearchData } from "./useSearchData";
 type Filter = "all" | ListingStatus;
 type Sort = "new" | "score" | "price" | "sqm";
 type Tab = "listings" | "hours";
-
-applyTheme(storedTheme());
 
 export default function App() {
   const auth = useAuth();
