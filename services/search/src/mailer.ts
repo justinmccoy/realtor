@@ -36,7 +36,7 @@ export async function sendMail(mail: Mail): Promise<void> {
   const html = `<!doctype html><body style="font-family:sans-serif;color:#2B1A14;line-height:1.5">
 <p>${escapeHtml(mail.body).replace(/\n/g, "<br>")}</p>
 ${mail.link ? `<p><a href="${escapeHtml(mail.link)}" style="background:#17694A;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;display:inline-block">${escapeHtml(mail.linkLabel ?? "Open")}</a></p>` : ""}
-<p style="color:#6F554B;font-size:13px">— Berlin Calling</p></body>`;
+<p style="color:#6F554B;font-size:13px">— Genau Here</p></body>`;
   try {
     await ses().send(
       new SendEmailCommand({

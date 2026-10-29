@@ -63,7 +63,7 @@ function callbacks(
             kind: "mfaSetup",
             user,
             secret,
-            otpauthUrl: `otpauth://totp/JJ%20Admin:${encodeURIComponent(email)}?secret=${secret}&issuer=JJ%20Admin`
+            otpauthUrl: `otpauth://totp/Genau%20Here:${encodeURIComponent(email)}?secret=${secret}&issuer=Genau%20Here`
           }),
         onFailure: reject
       });
