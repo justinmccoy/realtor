@@ -263,10 +263,18 @@ npx tsx scripts/seed.ts --env dev
     "Action": "sts:AssumeRoleWithWebIdentity",
     "Condition": {
       "StringEquals": { "token.actions.githubusercontent.com:aud": "sts.amazonaws.com" },
-      "StringLike":  { "token.actions.githubusercontent.com:sub": "repo:justinmccoy/realtor:*" }
+      "StringLike":  { "token.actions.githubusercontent.com:sub": [
+        "repo:justinmccoy/realtor:*",
+        "repo:justinmccoy@*/realtor@*:*"
+      ]}
     }
   }]
 }</code></pre>
+  <div class="note">GitHub may issue <b>ID-pinned</b> subject claims of the form
+  <code>repo:owner@&lt;ownerId&gt;/repo@&lt;repoId&gt;:…</code> — the second pattern
+  covers that. For tighter security, replace the <code>*</code> after the
+  <code>@</code>s with your actual numeric IDs (shown in any workflow's OIDC
+  token, or via <code>gh api repos/justinmccoy/realtor --jq '.id, .owner.id'</code>).</div>
   <p>Save as <code>deploy-policy.json</code> (CDK does the heavy lifting through its own bootstrap roles; this role only assumes them, reads stack outputs, and publishes the frontends):</p>
 <pre><code>{
   "Version": "2012-10-17",
