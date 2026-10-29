@@ -158,3 +158,97 @@ img {
   line-height: 1;
   transform: translateY(-50%);
 }
+
+/* skeleton loading */
+.sk {
+  background: linear-gradient(
+    100deg,
+    var(--sunk) 40%,
+    color-mix(in srgb, var(--surface) 70%, var(--sunk)) 50%,
+    var(--sunk) 60%
+  );
+  background-size: 200% 100%;
+  border-radius: 6px;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .sk {
+    animation: sk-shimmer 1.4s ease-in-out infinite;
+  }
+}
+@keyframes sk-shimmer {
+  from {
+    background-position: 120% 0;
+  }
+  to {
+    background-position: -80% 0;
+  }
+}
+.sk-line {
+  height: 13px;
+  margin-bottom: 10px;
+}
+.sk-title {
+  height: 46px;
+  width: 320px;
+  max-width: 70%;
+}
+.sk-bar {
+  height: 54px;
+  border-radius: 10px;
+}
+.sk-photo {
+  aspect-ratio: 3 / 2;
+  margin: -18px -18px 0;
+  border-radius: 10px 10px 0 0;
+}
+.sk-plate {
+  height: 26px;
+  width: 130px;
+}
+.sk-pill {
+  height: 22px;
+  width: 70px;
+  border-radius: 99px;
+}
+.sk-h3 {
+  height: 24px;
+  width: 85%;
+}
+.sk-price {
+  height: 32px;
+  width: 50%;
+}
+.sk-facts {
+  height: 56px;
+}
+
+/* photo placeholder for listings without images */
+.photo-ph {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  background: repeating-linear-gradient(
+      -45deg,
+      transparent 0 14px,
+      color-mix(in srgb, var(--dc) 6%, transparent) 14px 28px
+    ),
+    color-mix(in srgb, var(--dc) 14%, var(--surface));
+  color: var(--dc);
+}
+.photo-ph .ph-num {
+  font-family: "Barlow Condensed", "Arial Narrow", sans-serif;
+  font-size: 64px;
+  font-weight: 700;
+  line-height: 1;
+  opacity: 0.85;
+}
+.photo-ph .ph-name {
+  font-family: "Barlow Condensed", "Arial Narrow", sans-serif;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}

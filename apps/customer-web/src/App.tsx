@@ -7,6 +7,7 @@ import {
 import { api, type SearchLite } from "./api/client";
 import { useAuth } from "./auth/AuthContext";
 import { BriefPanel } from "./components/Brief";
+import { SkeletonBoard } from "./components/Skeleton";
 import { CommentThread } from "./components/Comments";
 import { HoursPanel } from "./components/HoursPanel";
 import { ListingCard } from "./components/ListingCard";
@@ -123,7 +124,7 @@ export default function App() {
   if (auth.status === "signedOut") return <Login />;
 
   if (loadError) return <div className="fatal">{loadError}</div>;
-  if (!searches) return <div className="loading">Loading your search…</div>;
+  if (!searches) return <SkeletonBoard />;
 
   if (!searches.length) {
     return (
@@ -141,7 +142,7 @@ export default function App() {
   }
 
   if (error) return <div className="fatal">{error}</div>;
-  if (!data || !searchId) return <div className="loading">Loading the board…</div>;
+  if (!data || !searchId) return <SkeletonBoard />;
 
   const listings = data.listings;
   const newIds = new Set(

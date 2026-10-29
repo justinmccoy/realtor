@@ -300,14 +300,19 @@ export function Listings({
                   </td>
                   <td>
                     <button
-                      className="btn ghost"
+                      className="vischips"
                       type="button"
                       onClick={() => setShareTarget(l)}
                       title="Manage per-client visibility"
                     >
-                      {visibleBadges(l)
-                        .map((b) => `${b.name}: ${REASON_LABEL[b.reason]}`)
-                        .join(" · ") || "—"}
+                      {visibleBadges(l).length === 0 && (
+                        <span className="vischip" data-v="no-match">no clients</span>
+                      )}
+                      {visibleBadges(l).map((b) => (
+                        <span className="vischip" data-v={b.reason} key={b.name}>
+                          {b.name} · {REASON_LABEL[b.reason]}
+                        </span>
+                      ))}
                     </button>
                   </td>
                   <td className="muted">{l.viewingAt ? fmtWhen(l.viewingAt) : "—"}</td>

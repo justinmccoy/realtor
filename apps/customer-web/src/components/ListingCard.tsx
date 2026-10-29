@@ -136,7 +136,18 @@ export function ListingCard({
       className={`card st-${l.status}${l.benchmark ? " is-bench" : ""}`}
       id={`card-${l.id}`}
     >
-      <Carousel listing={l} photos={gallery} onZoom={onZoom} />
+      {gallery.length > 0 ? (
+        <Carousel listing={l} photos={gallery} onZoom={onZoom} />
+      ) : (
+        <div
+          className="photo photo-ph"
+          style={{ ["--dc" as string]: `var(--d${districtNumber(l.bezirk)})` }}
+          aria-hidden="true"
+        >
+          <span className="ph-num">{districtNumber(l.bezirk)}</span>
+          <span className="ph-name">{l.ortsteil ?? l.bezirk}</span>
+        </div>
+      )}
       <div className="card-top">
         <span
           className="plate dplate"
