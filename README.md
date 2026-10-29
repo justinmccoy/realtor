@@ -1,9 +1,6 @@
-# JJ Berlin House Search
+# Genau Here
 
-A production version of the original "JJ Berlin House Search" single-file
-prototype: a curated
-Berlin **apartment-purchase** search run by a consultant (JJ) for invited
-clients. Clients review hand-picked listings, rate and discuss them, and see
+Clients review hand-picked listings, rate and discuss them, and see
 the consultant's billable hours; the admin manages everything and sees how
 clients interact with the site.
 
