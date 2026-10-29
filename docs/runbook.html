@@ -245,7 +245,14 @@ npx tsx scripts/seed.ts --env dev
   --url https://token.actions.githubusercontent.com \
   --client-id-list sts.amazonaws.com</code></pre>
 
-  <p><b>10b — the deploy role.</b> Save as <code>trust.json</code>:</p>
+  <p><b>10b — the deploy role.</b> The two JSON files below don't exist yet —
+  you create them as one-time inputs for the <code>aws iam</code> commands.
+  Save them <em>anywhere temporary</em> (e.g. <code>cd "$(mktemp -d)"</code> first —
+  not in the project repo); run the commands from that same directory so the
+  <code>file://</code> paths resolve; delete the files afterwards. Tip: set
+  <code>ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)</code>
+  and use <code>${ACCOUNT_ID}</code> in heredocs to avoid hand-editing.
+  First, <code>trust.json</code>:</p>
 <pre><code>{
   "Version": "2012-10-17",
   "Statement": [{
