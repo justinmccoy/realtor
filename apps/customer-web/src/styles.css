@@ -292,23 +292,30 @@ img {
 .tile .photo .nav {
   z-index: 2;
 }
-/* star rating overlay, top-right of the tile photo */
-.tile-stars {
+/* NEW tag overlay, top-left of the tile photo */
+.tile-new {
   position: absolute;
   top: 10px;
-  right: 10px;
+  left: 10px;
   z-index: 2;
-  display: flex;
+}
+/* star rating in the tile's top row, next to the status pill (above the
+   stretched link so the stars stay clickable) */
+.tile-stars {
+  position: relative;
+  z-index: 2;
+  display: inline-flex;
   align-items: center;
   gap: 1px;
-  padding: 3px 7px;
+  padding: 2px 6px;
   border-radius: 99px;
   background: color-mix(in srgb, var(--ink) 75%, transparent);
   line-height: 1;
+  flex: none;
 }
 .tile-stars .ts {
   font: inherit;
-  font-size: 16px;
+  font-size: 14px;
   line-height: 1;
   color: color-mix(in srgb, var(--bg) 45%, transparent);
   background: none;

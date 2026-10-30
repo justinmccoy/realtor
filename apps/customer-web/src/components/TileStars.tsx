@@ -3,7 +3,8 @@ import type { Rating } from "@jj/shared";
 import { api } from "../api/client";
 
 /**
- * Star rating pinned to the top-right corner of a board tile's photo.
+ * Star rating in a board tile's top row, between the district plate and
+ * the status pill.
  * Shows the caller's own rating; the stars stay empty until they rate.
  * Members with edit access can hover to preview and click to save a score
  * without opening the listing; viewers get a read-only version. The

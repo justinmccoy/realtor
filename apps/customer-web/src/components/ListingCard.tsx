@@ -9,10 +9,10 @@ import { Carousel, PhotoPlaceholder, type PhotoWithUrl } from "./Carousel";
 import { TileStars } from "./TileStars";
 
 /**
- * Board tile: photos with a star-rating overlay, district plate, NEW tag
- * and status, then price and size. Everything else lives on the detail
- * page, which the whole tile links to (stretched link; the carousel arrows
- * and the stars sit above it).
+ * Board tile: photos with a NEW tag overlay in the top-left corner, then
+ * district plate, star rating and status, then price and size. Everything
+ * else lives on the detail page, which the whole tile links to (stretched
+ * link; the carousel arrows and the stars sit above it).
  */
 export function ListingCard({
   listing,
@@ -49,14 +49,7 @@ export function ListingCard({
       ) : (
         <PhotoPlaceholder listing={l} />
       )}
-      <TileStars
-        searchId={searchId}
-        listingId={l.id}
-        ratings={ratings}
-        myName={myName}
-        canRate={canRate}
-        onChanged={onRatingsChanged}
-      />
+      {isNew && <span className="newtag tile-new">NEW</span>}
       <div className="card-top">
         <span
           className="plate dplate"
@@ -67,7 +60,14 @@ export function ListingCard({
           <span className="pb">{l.ortsteil ?? l.bezirk}</span>
         </span>
         <span style={{ display: "flex", gap: 6, alignItems: "center" }}>
-          {isNew && <span className="newtag">NEW</span>}
+          <TileStars
+            searchId={searchId}
+            listingId={l.id}
+            ratings={ratings}
+            myName={myName}
+            canRate={canRate}
+            onChanged={onRatingsChanged}
+          />
           <span className="pill" data-st={l.status}>
             {LISTING_STATUS_LABELS[l.status]}
           </span>
