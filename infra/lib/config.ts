@@ -3,8 +3,11 @@ import { App, RemovalPolicy } from "aws-cdk-lib";
 export interface DomainConfig {
   /** Route53 hosted zone name, e.g. "example.com". */
   zoneName: string;
-  /** Customer app FQDN, e.g. "www.example.com". */
+  /** Customer app FQDN, e.g. "example.com". */
   customer: string;
+  /** Extra hostnames that serve the customer app too, e.g. ["www.example.com"].
+   *  Each gets a DNS record, a place on the certificate and CORS access. */
+  customerAliases?: string[];
   /** Admin app FQDN, e.g. "admin.example.com". */
   admin: string;
 }
@@ -69,7 +72,9 @@ export function getConfig(app: App): AppConfig {
       raw.removalPolicy === "retain" ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY,
     enableWaf: raw.enableWaf ?? envName === "prod",
     alarmEmail: raw.alarmEmail || undefined,
-    domain: raw.domain ?? undefined,
+    domain: raw.domain
+      ? { ...raw.domain, customerAliases: raw.domain.customerAliases ?? [] }
+      : undefined,
     devOrigins: ["http://localhost:5173", "http://localhost:5174"],
     notify: raw.notify ?? {},
     listingImport: {
