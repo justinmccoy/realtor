@@ -146,14 +146,20 @@ export function Clients({
       return;
     }
     try {
-      await api.invite(target, {
+      const m = await api.invite(target, {
         email: email.trim(),
         displayName: name.trim(),
         role
       });
       setEmail("");
       setName("");
-      toast("Invitation sent — Cognito emails the temporary password");
+      toast(
+        m.invitation === "resent"
+          ? "They were invited before but never signed in — a fresh temporary password has been emailed"
+          : m.invitation === "existing"
+            ? "Added to the search — they already have an account, so no email was sent"
+            : "Invitation sent — Cognito emails the temporary password"
+      );
       onChanged();
       await load();
     } catch (ex) {

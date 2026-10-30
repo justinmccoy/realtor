@@ -184,7 +184,7 @@ export const handler = dispatch({
     fn: async ({ path, body, event }) => {
       const admin = adminAuth(event);
       const search = await repo.requireSearch(path.searchId);
-      const { userId, created } = await ensureCustomerUser(
+      const { userId, created, invitation } = await ensureCustomerUser(
         body.email,
         body.displayName
       );
@@ -203,7 +203,7 @@ export const handler = dispatch({
         entityId: userId,
         searchId: path.searchId,
         summary: `Invited ${body.displayName} (${body.email}) to ${search.clientName}'s search`,
-        after: { ...member, accountCreated: created }
+        after: { ...member, accountCreated: created, invitation }
       });
       await publishEvents(EVENT_SOURCES.search, {
         type: "member.invited",
@@ -213,9 +213,9 @@ export const handler = dispatch({
         actorRole: "admin",
         at: nowIso(),
         summary: `${body.displayName} invited to the search`,
-        payload: { userId, email: body.email, role: body.role }
+        payload: { userId, email: body.email, role: body.role, invitation }
       });
-      return { status: 201, body: member };
+      return { status: 201, body: { ...member, accountCreated: created, invitation } };
     }
   }),
 

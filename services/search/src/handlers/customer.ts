@@ -117,7 +117,10 @@ export const handler = dispatch({
       if (email === auth.email.toLowerCase()) {
         throw ApiError.conflict("You already have access to this search");
       }
-      const { userId, created } = await ensureCustomerUser(email, body.displayName);
+      const { userId, created, invitation } = await ensureCustomerUser(
+        email,
+        body.displayName
+      );
       if (await repo.getMember(path.searchId, userId)) {
         throw ApiError.conflict(`${email} already has access to this search`);
       }
@@ -146,10 +149,11 @@ export const handler = dispatch({
           email,
           displayName: body.displayName,
           role: body.role,
-          accountCreated: created
+          accountCreated: created,
+          invitation
         }
       });
-      return { status: 201, body: { ...member, accountCreated: created } };
+      return { status: 201, body: { ...member, accountCreated: created, invitation } };
     }
   })
 });

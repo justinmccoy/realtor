@@ -6,6 +6,7 @@ import type {
   CustomerListing,
   HoursEntry,
   InviteInput,
+  InviteResult,
   Member,
   MemberRole,
   Photo,
@@ -103,7 +104,7 @@ export const api = {
     call<{ items: HoursEntry[] }>(`/searches/${sid}/hours?limit=500`),
   members: (sid: string) => call<{ items: Member[] }>(`/searches/${sid}/members`),
   invite: (sid: string, body: InviteInput) =>
-    call<Member & { accountCreated: boolean }>(`/searches/${sid}/members`, {
+    call<InviteResult>(`/searches/${sid}/members`, {
       method: "POST",
       body
     }),

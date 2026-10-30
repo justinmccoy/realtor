@@ -50,9 +50,11 @@ export function InvitePanel({
         role
       });
       setDone(
-        m.accountCreated
-          ? `${m.displayName} has been invited. They'll get an email with a temporary password.`
-          : `${m.displayName} has been added. They can sign in with their existing account.`
+        m.invitation === "existing"
+          ? `${m.displayName} has been added. They can sign in with their existing account.`
+          : m.invitation === "resent"
+            ? `${m.displayName} was invited before but hasn't signed in yet. A fresh temporary password is on its way to them.`
+            : `${m.displayName} has been invited. They'll get an email with a temporary password.`
       );
       setName("");
       setEmail("");

@@ -9,6 +9,7 @@ import type {
   ImportJob,
   ImportRequest,
   InviteInput,
+  InviteResult,
   Listing,
   ListingCreateInput,
   ListingEngagement,
@@ -133,7 +134,7 @@ export const api = {
   putBrief: (sid: string, body: Brief) =>
     call<Brief>(`/admin/searches/${sid}/brief`, { method: "PUT", body }),
   invite: (sid: string, body: InviteInput) =>
-    call<Member>(`/admin/searches/${sid}/members`, { method: "POST", body }),
+    call<InviteResult>(`/admin/searches/${sid}/members`, { method: "POST", body }),
   removeMember: (sid: string, userId: string) =>
     call<void>(`/admin/searches/${sid}/members/${userId}`, { method: "DELETE" }),
 
