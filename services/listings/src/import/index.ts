@@ -8,7 +8,7 @@ import {
   type ImportFetchMode
 } from "@jj/shared";
 import { extractWithAi, type AiExtractInput, type AiExtractResult } from "./ai.js";
-import { fetchListingPage, fetchOptionsFromEnv, type FetchedPage } from "./fetchPage.js";
+import { fetchListingPage, resolveFetchOptions, type FetchedPage } from "./fetchPage.js";
 import { ortsteilDistrict } from "./geo.js";
 import {
   extractImageUrls,
@@ -43,9 +43,9 @@ export interface ImportDeps {
 }
 
 export function defaultDeps(): ImportDeps {
-  const fetchOpts = fetchOptionsFromEnv();
   return {
-    fetchPage: (url) => fetchListingPage(url, fetchOpts),
+    // Resolved per call: the proxy key comes from Secrets Manager (cached).
+    fetchPage: async (url) => fetchListingPage(url, await resolveFetchOptions()),
     ai: extractWithAi,
     aiTimeoutMs: 13_000
   };

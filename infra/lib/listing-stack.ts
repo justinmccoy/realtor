@@ -92,6 +92,21 @@ export class ListingStack extends Stack {
       description: "API key for the listing importer's AI extraction",
       removalPolicy: config.removalPolicy
     });
+    // Scraping-proxy API key: substituted for `{key}` in
+    // listingImport.proxyUrlTemplate at runtime, so cdk.json and the Lambda
+    // env only ever hold the template. Generated as a recognisable JSON
+    // placeholder; the importer treats that as "no key yet". Store the real
+    // one with put-secret-value — never change generateSecretString below,
+    // or CloudFormation would overwrite the stored key on the next deploy.
+    const proxySecret = new secretsmanager.Secret(this, "ImportProxyKey", {
+      secretName: `jj/${config.envName}/listing-import/proxy-api-key`,
+      description: "API key for the listing importer's scraping proxy ({key} in the URL template)",
+      generateSecretString: {
+        secretStringTemplate: JSON.stringify({ placeholder: true }),
+        generateStringKey: "nonce"
+      },
+      removalPolicy: config.removalPolicy
+    });
     const importFn = new ServiceFunction(this, "ImportFn", {
       config,
       serviceName: "listing-import",
@@ -100,6 +115,7 @@ export class ListingStack extends Stack {
       environment: {
         ...common,
         AI_SECRET_ARN: aiSecret.secretArn,
+        PROXY_SECRET_ARN: proxySecret.secretArn,
         IMPORT_AI_MODEL: config.listingImport.aiModel ?? "",
         IMPORT_PROXY_URL_TEMPLATE: config.listingImport.proxyUrlTemplate ?? ""
       },
@@ -109,9 +125,11 @@ export class ListingStack extends Stack {
     table.grantReadWriteData(importFn);
     bus.grantPutEventsTo(importFn);
     aiSecret.grantRead(importFn);
+    proxySecret.grantRead(importFn);
     // One import legitimately takes 5–25 s, so the latency alarm is relaxed.
     addFunctionAlarms(this, "Import", importFn, props.alarmTopic, { slowP95Ms: 27_000 });
     new CfnOutput(this, "ImportAiSecretName", { value: aiSecret.secretName });
+    new CfnOutput(this, "ImportProxySecretName", { value: proxySecret.secretName });
 
     const adminInt = new HttpLambdaIntegration("AdminInt", adminFn);
     const customerInt = new HttpLambdaIntegration("CustomerInt", customerFn);

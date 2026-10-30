@@ -114,12 +114,21 @@ Configuration, per environment:
 |---|---|---|
 | AI extraction key | Secrets Manager secret `jj/<env>/listing-import/ai-api-key` (created by the Listing stack with a placeholder) | AI off until a real key is stored |
 | AI model | `infra/cdk.json` → `environments.<env>.listingImport.aiModel` | `DEFAULT_AI_MODEL` in `services/listings/src/import/ai.ts` |
-| Fetch proxy | `environments.<env>.listingImport.proxyUrlTemplate`, a scraping-API URL with `{url}` for the encoded target | none → direct fetch only |
+| Fetch proxy | `environments.<env>.listingImport.proxyUrlTemplate`, a scraping-API URL with `{url}` for the encoded target and `{key}` for the API key, e.g. `https://app.scrapingbee.com/api/v1/?api_key={key}&render_js=true&url={url}` | none → direct fetch only |
+| Fetch proxy API key | Secrets Manager secret `jj/<env>/listing-import/proxy-api-key` (created by the Listing stack with a placeholder) | proxy stays off until stored |
 
 ```bash
 aws secretsmanager put-secret-value \
   --secret-id jj/dev/listing-import/ai-api-key --secret-string "sk-ant-…"
+aws secretsmanager put-secret-value \
+  --secret-id jj/dev/listing-import/proxy-api-key --secret-string "<provider key>"
 ```
+
+The proxy key is never written to `cdk.json` or a Lambda environment
+variable: the template carries `{key}` and the importer fills it in from the
+secret at runtime. If the template is set but the secret still holds its
+placeholder, imports fall back to direct fetches and the Blocked message says
+the proxy key is missing.
 
 Notes: ImmobilienScout24 and Kleinanzeigen usually refuse requests from cloud
 IP ranges; a scraping proxy or the paste fallback covers them. Up to 15 photos

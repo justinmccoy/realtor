@@ -1,9 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
-import {
-  GetSecretValueCommand,
-  SecretsManagerClient
-} from "@aws-sdk/client-secrets-manager";
 import { logger } from "@jj/lambda-kit";
 import {
   BALCONY_STATES,
@@ -16,6 +12,7 @@ import {
 // ships under this subpath; the rest of the repo stays on the v3 API.
 import { z } from "zod/v4";
 import { canonicalOrtsteil } from "./geo.js";
+import { readSecretFromEnv } from "./secrets.js";
 
 /**
  * AI extraction: the page text goes to the model with a fixed output schema.
@@ -97,23 +94,10 @@ async function resolveApiKey(): Promise<string | null> {
     cachedKey = direct;
     return cachedKey;
   }
-  const arn = process.env.AI_SECRET_ARN;
-  if (!arn) {
-    cachedKey = null;
-    return cachedKey;
-  }
-  try {
-    const res = await new SecretsManagerClient({}).send(
-      new GetSecretValueCommand({ SecretId: arn })
-    );
-    const value = res.SecretString?.trim() ?? "";
-    // The stack creates the secret with a random placeholder until the admin
-    // stores a real key; only real keys start with this prefix.
-    cachedKey = value.startsWith("sk-ant-") ? value : null;
-  } catch (err) {
-    logger.warn("ai secret unavailable", { error: (err as Error).message });
-    cachedKey = null;
-  }
+  const value = await readSecretFromEnv("AI_SECRET_ARN");
+  // The stack created this secret with a random string before the placeholder
+  // scheme existed, so the prefix check is what tells a real key apart.
+  cachedKey = value && value.startsWith("sk-ant-") ? value : null;
   return cachedKey;
 }
 
