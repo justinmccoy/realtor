@@ -6,6 +6,8 @@ import type {
   HoursCreateInput,
   HoursEntry,
   HoursUpdateInput,
+  ImportRequest,
+  ImportResult,
   InviteInput,
   Listing,
   ListingCreateInput,
@@ -14,6 +16,7 @@ import type {
   ListingUpdateInput,
   Member,
   Photo,
+  PhotoImportItem,
   PhotoKind,
   PresignResponse,
   Rating,
@@ -194,6 +197,15 @@ export const api = {
   ) => call<Source>(`/admin/inbox/${sourceId}`, { method: "PATCH", body }),
   deleteInbox: (sourceId: string) =>
     call<void>(`/admin/inbox/${sourceId}`, { method: "DELETE" }),
+
+  /* link import → draft listing (+ photos downloaded by the media service) */
+  importListing: (body: ImportRequest) =>
+    call<ImportResult>("/admin/import", { method: "POST", body }),
+  importPhotos: (lid: string, kind: PhotoKind, urls: string[]) =>
+    call<{ items: PhotoImportItem[] }>(`/admin/listings/${lid}/photos/import`, {
+      method: "POST",
+      body: { kind, urls }
+    }),
 
   /* media (per listing) */
   photos: (lid: string) =>

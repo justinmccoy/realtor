@@ -3,6 +3,7 @@ import {
   adminAuth,
   apiHandler,
   dispatch,
+  logger,
   newId,
   nowIso,
   publishAdminAction,
@@ -13,11 +14,14 @@ import {
   EVENT_SOURCES,
   MAX_PHOTO_BYTES,
   PHOTO_KINDS,
+  photoImportSchema,
   photoReorderSchema,
   presignRequestSchema,
   type Photo,
+  type PhotoImportItem,
   type PresignResponse
 } from "@jj/shared";
+import { downloadImage } from "../import.js";
 import { photoS3Key } from "../keys.js";
 import * as repo from "../repo.js";
 import * as s3 from "../s3.js";
@@ -104,6 +108,74 @@ export const handler = dispatch({
         summary: `${ready.kind === "floorplan" ? "Floor plan" : "Photo"} added`
       });
       return { body: await withUrl(ready) };
+    }
+  }),
+
+  /** Listing import: download photos from the source page straight into the
+   *  bucket. Downloads run in parallel so a batch stays inside the API
+   *  Gateway timeout; each URL reports success or failure individually. */
+  "POST /api/v1/admin/listings/{listingId}/photos/import": apiHandler({
+    path: listingPath,
+    body: photoImportSchema,
+    fn: async ({ path, body, event }) => {
+      const admin = adminAuth(event);
+      const base = await repo.nextSortOrder(path.listingId);
+      const settled = await Promise.allSettled(
+        body.urls.map(async (url, i): Promise<Photo> => {
+          const { body: bytes, contentType } = await downloadImage(url);
+          const photoId = newId();
+          const s3Key = photoS3Key(path.listingId, photoId, contentType);
+          await s3.putObject(s3Key, bytes, contentType);
+          const photo: Photo = {
+            id: photoId,
+            listingId: path.listingId,
+            kind: body.kind,
+            s3Key,
+            contentType,
+            sortOrder: base + i,
+            status: "ready",
+            createdAt: nowIso()
+          };
+          await repo.putPhoto(photo);
+          return photo;
+        })
+      );
+      const items: PhotoImportItem[] = [];
+      for (const [i, outcome] of settled.entries()) {
+        const url = body.urls[i]!;
+        if (outcome.status === "fulfilled") {
+          items.push({ url, ok: true, photo: await withUrl(outcome.value) });
+        } else {
+          const err = outcome.reason as Error;
+          logger.warn("photo import failed", { url, error: err.message });
+          items.push({
+            url,
+            ok: false,
+            error: err instanceof ApiError ? err.message : "Download failed"
+          });
+        }
+      }
+      const okCount = items.filter((i) => i.ok).length;
+      if (okCount > 0) {
+        const noun = body.kind === "floorplan" ? "floor plan" : "photo";
+        await publishAdminAction(EVENT_SOURCES.media, admin, {
+          action: "import-photos",
+          entity: "photo",
+          entityId: path.listingId,
+          listingId: path.listingId,
+          summary: `Imported ${okCount} ${noun}${okCount === 1 ? "" : "s"} from the source page`
+        });
+        await publishEvents(EVENT_SOURCES.media, {
+          type: "photo.added",
+          listingId: path.listingId,
+          actorId: admin.userId,
+          actorName: admin.displayName,
+          actorRole: "admin",
+          at: nowIso(),
+          summary: `${okCount} ${noun}${okCount === 1 ? "" : "s"} imported`
+        });
+      }
+      return { body: { items } };
     }
   }),
 

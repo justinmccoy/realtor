@@ -45,3 +45,30 @@ export type Photo = z.infer<typeof photoSchema>;
 export const photoReorderSchema = z.object({
   orderedIds: z.array(z.string().ulid()).min(1).max(100)
 });
+
+/** Server-side import: the media service downloads each URL into the bucket.
+ *  Small batches keep one call well inside the API Gateway timeout. */
+export const MAX_PHOTO_IMPORT_BATCH = 6;
+
+export const photoImportSchema = z.object({
+  kind: z.enum(PHOTO_KINDS).default("photo"),
+  urls: z
+    .array(
+      z
+        .string()
+        .url()
+        .max(2000)
+        .regex(/^https?:\/\//i, "Only http(s) URLs are allowed")
+    )
+    .min(1)
+    .max(MAX_PHOTO_IMPORT_BATCH)
+});
+export type PhotoImportInput = z.infer<typeof photoImportSchema>;
+
+export const photoImportItemSchema = z.object({
+  url: z.string(),
+  ok: z.boolean(),
+  photo: photoSchema.extend({ url: z.string().url() }).optional(),
+  error: z.string().optional()
+});
+export type PhotoImportItem = z.infer<typeof photoImportItemSchema>;

@@ -1,8 +1,9 @@
-import { Duration, Stack, type StackProps } from "aws-cdk-lib";
+import { CfnOutput, Duration, Stack, type StackProps } from "aws-cdk-lib";
 import { HttpMethod } from "aws-cdk-lib/aws-apigatewayv2";
 import { HttpLambdaIntegration } from "aws-cdk-lib/aws-apigatewayv2-integrations";
 import * as events from "aws-cdk-lib/aws-events";
 import * as targets from "aws-cdk-lib/aws-events-targets";
+import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import type * as sns from "aws-cdk-lib/aws-sns";
 import type { Construct } from "constructs";
 import type { ApiRoutes } from "./api-stack";
@@ -79,9 +80,50 @@ export class ListingStack extends Stack {
       targets: [new targets.LambdaFunction(eventsFn, { retryAttempts: 2 })]
     });
 
+    // Link import: fetch a portal page, extract fields (markup + AI), create a
+    // draft. Separate Lambda so it can use the whole API Gateway window
+    // (30 s) and more memory without touching the ordinary admin routes.
+    // The AI key lives in Secrets Manager; the stack creates the secret with
+    // a random placeholder and the importer treats anything that is not a
+    // real key as "AI off". Store the key with
+    //   aws secretsmanager put-secret-value --secret-id <name> --secret-string sk-ant-…
+    const aiSecret = new secretsmanager.Secret(this, "ImportAiKey", {
+      secretName: `jj/${config.envName}/listing-import/ai-api-key`,
+      description: "API key for the listing importer's AI extraction",
+      removalPolicy: config.removalPolicy
+    });
+    const importFn = new ServiceFunction(this, "ImportFn", {
+      config,
+      serviceName: "listing-import",
+      entry: "services/listings/src/handlers/import.ts",
+      description: "Listing service: import a draft listing from a portal link",
+      environment: {
+        ...common,
+        AI_SECRET_ARN: aiSecret.secretArn,
+        IMPORT_AI_MODEL: config.listingImport.aiModel ?? "",
+        IMPORT_PROXY_URL_TEMPLATE: config.listingImport.proxyUrlTemplate ?? ""
+      },
+      memorySize: 1024,
+      timeout: Duration.seconds(29)
+    }).fn;
+    table.grantReadWriteData(importFn);
+    bus.grantPutEventsTo(importFn);
+    aiSecret.grantRead(importFn);
+    // One import legitimately takes 5–25 s, so the latency alarm is relaxed.
+    addFunctionAlarms(this, "Import", importFn, props.alarmTopic, { slowP95Ms: 27_000 });
+    new CfnOutput(this, "ImportAiSecretName", { value: aiSecret.secretName });
+
     const adminInt = new HttpLambdaIntegration("AdminInt", adminFn);
     const customerInt = new HttpLambdaIntegration("CustomerInt", customerFn);
+    const importInt = new HttpLambdaIntegration("ImportInt", importFn);
     const { httpApi, adminAuthorizer, customerAuthorizer } = routes;
+
+    httpApi.addRoutes({
+      path: "/api/v1/admin/import",
+      methods: [HttpMethod.POST],
+      integration: importInt,
+      authorizer: adminAuthorizer
+    });
 
     httpApi.addRoutes({
       path: "/api/v1/admin/listings",

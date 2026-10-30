@@ -6,6 +6,8 @@ export type ErrorCode =
   | "not_found"
   | "conflict"
   | "payload_too_large"
+  /** A third-party site refused or failed the request (e.g. a bot wall). */
+  | "upstream_blocked"
   | "internal";
 
 /** Consistent error body returned by every endpoint. */

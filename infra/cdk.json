@@ -16,6 +16,10 @@
           "adminEmail": "",
           "customerUrl": "",
           "adminUrl": ""
+        },
+        "listingImport": {
+          "proxyUrlTemplate": "",
+          "aiModel": ""
         }
       },
       "prod": {
@@ -24,7 +28,11 @@
         "removalPolicy": "retain",
         "enableWaf": true,
         "alarmEmail": "",
-        "domain": null
+        "domain": null,
+        "listingImport": {
+          "proxyUrlTemplate": "",
+          "aiModel": ""
+        }
       }
     },
     "@aws-cdk/aws-apigateway:usagePlanKeyOrderInsensitiveId": true,

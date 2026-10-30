@@ -10,6 +10,8 @@ import {
   REMODEL_ITEMS,
   listingCreateSchema,
   type DistrictName,
+  type FieldProvenance,
+  type ImportFetchMode,
   type Listing,
   type ListingCreateInput,
   type RemodelItem
@@ -17,13 +19,30 @@ import {
 import { api } from "../api/client";
 import { isoToLocalInput, localInputToIso } from "../lib/format";
 import { linesOf, parseNum, toLines } from "../lib/parse";
-import { Field, Modal } from "../components/ui";
+import { DangerButton, Field, Modal } from "../components/ui";
+
+/** What the link importer did, shown above the form so the admin knows
+ *  which values to double-check. */
+export interface ImportSummary {
+  provenance: Record<string, FieldProvenance>;
+  warnings: string[];
+  portal: string | null;
+  fetchedVia: ImportFetchMode;
+  aiUsed: boolean;
+  photosAdded: number;
+  photosFailed: number;
+  photoCandidates: number;
+  /** Inbox link the draft came from; restored to pending if discarded. */
+  sourceId?: string;
+}
 
 export interface EditorTarget {
   listing: Listing | null;
   /** When converting an inbox link: prefill + mark done on save. */
   sourceId?: string;
   sourceUrl?: string;
+  /** Set when `listing` is a freshly imported draft. */
+  imported?: ImportSummary;
 }
 
 export function ListingEditor({
@@ -149,12 +168,42 @@ export function ListingEditor({
     }
   }
 
+  const imp = target.imported;
+  const filledCount = imp ? Object.keys(imp.provenance).length : 0;
+  const aiCount = imp ? Object.values(imp.provenance).filter((p) => p === "ai").length : 0;
+
+  /** Per-field provenance hint for imported drafts. */
+  const autoHint = (key: string, extra?: string): string | undefined => {
+    const p = imp?.provenance[key];
+    const auto =
+      p === "ai" ? "Auto-filled by AI — check it" : p === "page" ? "Auto-filled from the page" : undefined;
+    return [auto, extra].filter(Boolean).join(" · ") || undefined;
+  };
+
+  async function discardImport() {
+    if (!l || !imp) return;
+    setBusy(true);
+    try {
+      await api.deleteListing(l.id);
+      if (imp.sourceId) {
+        await api.patchInbox(imp.sourceId, { status: "pending", listingId: null });
+      }
+      toast("Imported draft discarded");
+      onSaved();
+      onClose();
+    } catch (ex) {
+      setErr(ex instanceof Error ? ex.message : "Couldn't discard the draft");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const text = (
     label: string,
     key: keyof typeof f,
     opts: { placeholder?: string; hint?: string } = {}
   ) => (
-    <Field label={label} hint={opts.hint}>
+    <Field label={label} hint={autoHint(key, opts.hint)}>
       <input
         value={f[key] as string}
         placeholder={opts.placeholder}
@@ -163,7 +212,7 @@ export function ListingEditor({
     </Field>
   );
   const area = (label: string, key: keyof typeof f, placeholder?: string) => (
-    <Field label={label}>
+    <Field label={label} hint={autoHint(key)}>
       <textarea
         value={f[key] as string}
         placeholder={placeholder}
@@ -173,8 +222,40 @@ export function ListingEditor({
   );
 
   return (
-    <Modal title={l ? "Edit listing" : "Add listing"} onClose={onClose}>
+    <Modal
+      title={imp ? "Review imported listing" : l ? "Edit listing" : "Add listing"}
+      onClose={onClose}
+    >
       <form onSubmit={save} style={{ display: "flex", flexDirection: "column", gap: 14 }} noValidate>
+        {imp && (
+          <div className="vbox">
+            <div className="vbox-h">
+              <h4>Imported draft</h4>
+              <span className="rmini2 ok">
+                {filledCount} field{filledCount === 1 ? "" : "s"} auto-filled
+                {aiCount ? ` · ${aiCount} by AI` : ""}
+              </span>
+            </div>
+            <p className="note-line" style={{ margin: 0 }}>
+              From {imp.portal ?? "pasted text"}
+              {imp.fetchedVia === "paste" ? " (pasted)" : ""}
+              {imp.aiUsed ? ", page markup + AI." : ", page markup only."}{" "}
+              {imp.photosAdded} photo{imp.photosAdded === 1 ? "" : "s"} added
+              {imp.photosFailed ? `, ${imp.photosFailed} failed` : ""}
+              {imp.photoCandidates > imp.photosAdded + imp.photosFailed
+                ? ` (${imp.photoCandidates} found on the page)`
+                : ""}
+              . It stays a hidden draft until you tick Active — check every value first.
+            </p>
+            {imp.warnings.length > 0 && (
+              <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, color: "var(--warn)" }}>
+                {imp.warnings.map((w) => (
+                  <li key={w}>{w}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
         {text("Title", "title", { placeholder: "Bright Altbau with balcony" })}
         <label className="bmk">
           <input
@@ -196,7 +277,7 @@ export function ListingEditor({
           placeholder: "https://www.immobilienscout24.de/expose/…"
         })}
         <div className="two">
-          <Field label="District">
+          <Field label="District" hint={autoHint("bezirk")}>
             <select
               value={f.bezirk}
               onChange={(e) => {
@@ -211,7 +292,7 @@ export function ListingEditor({
               ))}
             </select>
           </Field>
-          <Field label="Area">
+          <Field label="Area" hint={autoHint("ortsteil")}>
             <select value={f.ortsteil} onChange={(e) => set("ortsteil", e.target.value)}>
               <option value="">Not set</option>
               {ORTSTEILE[f.bezirk].map((o) => (
@@ -231,7 +312,7 @@ export function ListingEditor({
             hint: '"Zimmer": includes the living room'
           })}
           {text("Bathrooms", "baths")}
-          <Field label="Balcony">
+          <Field label="Balcony" hint={autoHint("balcony")}>
             <select
               value={f.balcony}
               onChange={(e) => set("balcony", e.target.value as (typeof BALCONY_STATES)[number])}
@@ -368,8 +449,15 @@ export function ListingEditor({
 
         {err && <p className="err">{err}</p>}
         <div className="sheet-f">
+          {imp && (
+            <DangerButton
+              label="Discard draft"
+              disabled={busy}
+              onConfirm={() => void discardImport()}
+            />
+          )}
           <button className="btn" type="button" onClick={onClose}>
-            Cancel
+            {imp ? "Keep draft, close" : "Cancel"}
           </button>
           <button className="btn primary" type="submit" disabled={busy}>
             Save listing

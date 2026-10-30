@@ -18,6 +18,7 @@ import { api, type PhotoWithUrl } from "../api/client";
 import { eur, fmtWhen } from "../lib/format";
 import { DangerButton, Modal, useToast } from "../components/ui";
 import { ListingEditor, type EditorTarget } from "./ListingEditor";
+import { ImportRunner, type ImportStart } from "./ListingImport";
 
 interface SearchCtx {
   search: Search;
@@ -50,6 +51,8 @@ export function Listings({
   const [sort, setSort] = useState<"new" | "price" | "sqm">("new");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [editor, setEditor] = useState<EditorTarget | null>(null);
+  const [importStart, setImportStart] = useState<ImportStart | null>(null);
+  const [inboxKey, setInboxKey] = useState(0);
   const [photoTarget, setPhotoTarget] = useState<Listing | null>(null);
   const [shareTarget, setShareTarget] = useState<Listing | null>(null);
   const [toastEl, toast] = useToast();
@@ -353,8 +356,29 @@ export function Listings({
         never shown. Click to change.
       </p>
 
-      <Inbox onConvert={(t) => setEditor(t)} toast={toast} />
+      <Inbox
+        onConvert={(t) => setEditor(t)}
+        onImport={(s) => setImportStart(s)}
+        refreshKey={inboxKey}
+        toast={toast}
+      />
 
+      {importStart && (
+        <ImportRunner
+          start={importStart}
+          onClose={() => {
+            setImportStart(null);
+            setInboxKey((k) => k + 1);
+          }}
+          onDone={(t) => {
+            setImportStart(null);
+            setInboxKey((k) => k + 1);
+            setEditor(t);
+            void reload();
+          }}
+          toast={toast}
+        />
+      )}
       {editor && (
         <ListingEditor
           target={editor}
@@ -462,9 +486,14 @@ function ShareManager({
 
 function Inbox({
   onConvert,
+  onImport,
+  refreshKey,
   toast
 }: {
   onConvert: (t: EditorTarget) => void;
+  onImport: (s: ImportStart) => void;
+  /** Bumped by the parent when an import finished or was closed. */
+  refreshKey: number;
   toast: (m: string) => void;
 }) {
   const [sources, setSources] = useState<Source[]>([]);
@@ -473,7 +502,7 @@ function Inbox({
   const reload = useCallback(() => api.inbox().then((r) => setSources(r.items)), []);
   useEffect(() => {
     void reload();
-  }, [reload]);
+  }, [reload, refreshKey]);
 
   const pending = sources.filter((s) => s.status !== "done");
 
@@ -510,8 +539,17 @@ function Inbox({
           <button className="btn primary" type="submit">
             Add to inbox
           </button>
+          <button
+            className="btn"
+            type="button"
+            onClick={() => onImport({ paste: true })}
+            title="For portals that block automated requests: paste the page text"
+          >
+            Import from pasted text
+          </button>
           <span className="note-line">
-            Convert a link into a listing with the button next to it.
+            <b>Import</b> fetches the page, fills in the details and photos, and opens the
+            draft for review. <b>Manual</b> opens an empty form with just the link.
           </span>
         </div>
       </form>
@@ -519,17 +557,43 @@ function Inbox({
         <ul>
           {pending.map((s) => (
             <li key={s.id}>
-              <span className="tag">Pending</span>
+              <span
+                className="tag"
+                title={
+                  s.status === "failed"
+                    ? "The portal blocked the automated fetch — import from pasted text"
+                    : undefined
+                }
+              >
+                {s.status === "failed" ? "Blocked" : "Pending"}
+              </span>
               <a href={s.url} target="_blank" rel="noopener noreferrer">
                 {s.url}
               </a>
               <span className="row-actions">
+                {s.status === "failed" ? (
+                  <button
+                    className="btn primary"
+                    type="button"
+                    onClick={() => onImport({ url: s.url, sourceId: s.id, paste: true })}
+                  >
+                    Paste text
+                  </button>
+                ) : (
+                  <button
+                    className="btn primary"
+                    type="button"
+                    onClick={() => onImport({ url: s.url, sourceId: s.id })}
+                  >
+                    Import
+                  </button>
+                )}
                 <button
                   className="btn ghost"
                   type="button"
                   onClick={() => onConvert({ listing: null, sourceId: s.id, sourceUrl: s.url })}
                 >
-                  Convert
+                  Manual
                 </button>
                 <DangerButton
                   onConfirm={() => void api.deleteInbox(s.id).then(() => reload())}
