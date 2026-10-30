@@ -292,14 +292,12 @@ img {
 .tile .photo .nav {
   z-index: 2;
 }
-/* NEW tag flush in the tile's top-left corner, following the card radius */
+/* NEW tag overlay, top-left of the tile photo */
 .tile-new {
   position: absolute;
-  top: 0;
-  left: 0;
+  top: 10px;
+  left: 10px;
   z-index: 2;
-  padding: 5px 11px;
-  border-radius: calc(var(--r) - 1px) 0 6px 0;
 }
 /* star rating in the tile's top row, next to the status pill (above the
    stretched link so the stars stay clickable) */
