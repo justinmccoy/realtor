@@ -4,7 +4,7 @@ import {
   PutCommand,
   QueryCommand
 } from "@aws-sdk/lib-dynamodb";
-import { ddb, nowIso, tableName } from "@jj/lambda-kit";
+import { ddb, tableName } from "@jj/lambda-kit";
 import {
   ApiError,
   commentSchema,
@@ -171,8 +171,8 @@ export async function getComment(
   return res.Item ? itemToComment(res.Item) : null;
 }
 
-/** Newest-first. Soft-deleted comments keep their place with a blank body so
- *  threads stay intact. */
+/** Newest-first. Rows soft-deleted by an earlier version (blank body,
+ *  `deletedAt` set) are left out: a removed comment is simply gone. */
 export async function listComments(searchId: string): Promise<Comment[]> {
   const items: Record<string, unknown>[] = [];
   let lastKey: Record<string, unknown> | undefined;
@@ -192,16 +192,27 @@ export async function listComments(searchId: string): Promise<Comment[]> {
     items.push(...(res.Items ?? []));
     lastKey = res.LastEvaluatedKey;
   } while (lastKey && items.length < 5000);
-  return items.map(itemToComment);
+  return items.map(itemToComment).filter((c) => c.deletedAt === null);
 }
 
-export async function softDeleteComment(
+/**
+ * Removes a comment outright. A root comment takes its replies with it:
+ * without the comment they answered, they would be orphans in every view.
+ * Returns what was removed so the audit log can say so.
+ */
+export async function deleteComment(
   searchId: string,
   commentId: string
-): Promise<Comment> {
+): Promise<{ removed: Comment; replies: Comment[] }> {
   const existing = await getComment(searchId, commentId);
   if (!existing) throw ApiError.notFound("Comment");
-  const redacted: Comment = { ...existing, body: "", deletedAt: nowIso() };
-  await putComment(redacted);
-  return redacted;
+  const replies = existing.parentId
+    ? []
+    : (await listComments(searchId)).filter((c) => c.parentId === commentId);
+  for (const c of [...replies, existing]) {
+    await ddb().send(
+      new DeleteCommand({ TableName: T(), Key: engagementKeys.comment(searchId, c.id) })
+    );
+  }
+  return { removed: existing, replies };
 }

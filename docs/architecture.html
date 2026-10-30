@@ -483,7 +483,7 @@
     <tr><td>search</td><td><code>SEARCH#id → META, BRIEF, MEMBER#user</code></td><td>GSI by user → "my searches" (powers the authorizer); conditional update throttles last-seen to 1/15 min</td></tr>
     <tr><td>listing</td><td><code>POOL → LISTING#id, SOURCE#id</code> · <code>SEARCH#id → CRITERIA, SHARE#listing</code> · <code>IMPORTJOB#id → JOB</code></td><td>sparse GSI containing only listings with a future viewing → cross-search viewings list; CRITERIA is the event-carried brief + settings; import jobs carry a one-day TTL</td></tr>
     <tr><td>media</td><td><code>LISTING#id → PHOTO#id, META</code></td><td>GSI by search for the gallery; META carries the event-fed published flag</td></tr>
-    <tr><td>engagement</td><td><code>LISTING#id → RATING#user</code> · <code>SEARCH#id → COMMENT#id</code></td><td>GSI: all ratings per search; soft-deleted comments keep thread shape</td></tr>
+    <tr><td>engagement</td><td><code>LISTING#id → RATING#user</code> · <code>SEARCH#id → COMMENT#id</code></td><td>GSI: all ratings per search; deleting a comment removes it outright, a root together with its replies</td></tr>
     <tr><td>timesheet</td><td><code>SEARCH#id → HOURS#id, TIMER</code></td><td>timer uses a conditional put — only one can run</td></tr>
     <tr><td>activity</td><td><code>SEARCH#id → EVENT#time, ROLLUP#listing</code> · <code>AUDIT → time</code></td><td>TTL on feed rows only; GSIs by actor and global-recent; counters via atomic ADD</td></tr>
   </table>

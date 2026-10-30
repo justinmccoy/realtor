@@ -135,7 +135,7 @@ describe.skipIf(!run)("engagement repo against DynamoDB (local emulator)", () =>
     expect(await repo.listRatingsByListing(lid)).toHaveLength(0);
   });
 
-  it("comments: ordering, threads, soft delete", async () => {
+  it("comments: ordering, threads, delete removes a root with its replies", async () => {
     const repo = await import("../../src/repo.js");
     const base: Omit<Comment, "id" | "createdAt"> = {
       searchId: SID,
@@ -154,6 +154,8 @@ describe.skipIf(!run)("engagement repo against DynamoDB (local emulator)", () =>
       createdAt: new Date().toISOString()
     };
     await repo.putComment(first);
+    // ULIDs minted in the same millisecond sort arbitrarily; make "newer" real.
+    await new Promise((r) => setTimeout(r, 5));
     const reply: Comment = {
       ...base,
       id: newId(),
@@ -170,13 +172,48 @@ describe.skipIf(!run)("engagement repo against DynamoDB (local emulator)", () =>
       list.findIndex((c) => c.id === first.id)
     );
 
-    const redacted = await repo.softDeleteComment(SID, first.id);
-    expect(redacted.body).toBe("");
-    expect(redacted.deletedAt).not.toBeNull();
+    // A second root with a reply, where only the reply is removed.
+    const second: Comment = {
+      ...base,
+      id: newId(),
+      body: "Second comment",
+      createdAt: new Date().toISOString()
+    };
+    await repo.putComment(second);
+    const secondReply: Comment = {
+      ...base,
+      id: newId(),
+      parentId: second.id,
+      body: "Reply to second",
+      createdAt: new Date().toISOString()
+    };
+    await repo.putComment(secondReply);
+
+    const out = await repo.deleteComment(SID, first.id);
+    expect(out.removed.id).toBe(first.id);
+    expect(out.replies.map((c) => c.id)).toEqual([reply.id]);
     const after = await repo.listComments(SID);
-    const kept = after.find((c) => c.id === first.id)!;
-    expect(kept.deletedAt).not.toBeNull();
-    // Thread structure survives: the reply still points at the parent.
-    expect(after.find((c) => c.id === reply.id)?.parentId).toBe(first.id);
+    expect(after.some((c) => c.id === first.id)).toBe(false);
+    expect(after.some((c) => c.id === reply.id)).toBe(false);
+    expect(after.some((c) => c.id === second.id)).toBe(true);
+
+    const onlyReply = await repo.deleteComment(SID, secondReply.id);
+    expect(onlyReply.replies).toEqual([]);
+    const afterReply = await repo.listComments(SID);
+    expect(afterReply.some((c) => c.id === second.id)).toBe(true);
+    expect(afterReply.some((c) => c.id === secondReply.id)).toBe(false);
+
+    await expect(repo.deleteComment(SID, first.id)).rejects.toThrow();
+
+    // Rows soft-deleted by the previous version stay hidden.
+    const legacy: Comment = {
+      ...base,
+      id: newId(),
+      body: "",
+      deletedAt: new Date().toISOString(),
+      createdAt: new Date().toISOString()
+    };
+    await repo.putComment(legacy);
+    expect((await repo.listComments(SID)).some((c) => c.id === legacy.id)).toBe(false);
   });
 });
