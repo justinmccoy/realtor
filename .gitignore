@@ -12,3 +12,4 @@ coverage/
 seed/private-*.json
 seed/photos-*.json
 seed/*-export.json
+.claude/worktrees/
