@@ -41,7 +41,7 @@
           "adminUrl": "https://admin.genauhere.de"
         },
         "listingImport": {
-          "proxyUrlTemplate": "",
+          "proxyUrlTemplate": "https://app.scrapingbee.com/api/v1/?api_key={key}&render_js=true&premium_proxy=true&country_code=de&url={url}",
           "aiModel": ""
         }
       }
