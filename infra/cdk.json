@@ -18,7 +18,7 @@
           "adminUrl": "https://dveqa1ss76yri.cloudfront.net"
         },
         "listingImport": {
-          "proxyUrlTemplate": "",
+          "proxyUrlTemplate": "https://app.scrapingbee.com/api/v1/?api_key={key}&render_js=true&premium_proxy=true&country_code=de&url={url}",
           "aiModel": ""
         }
       },
