@@ -71,8 +71,9 @@
 
 <p class="lead">
   Everything from a brand-new AWS account to a working dev deployment of the
-  apartment-search platform, plus the CI/CD hookup for the
-  <code>justinmccoy/realtor</code> repo. Anything shown
+  apartment-search platform, the CI/CD hookup for the
+  <code>justinmccoy/realtor</code> repo, and then production on your own
+  domain with AI import enabled. Anything shown
   <span class="ph">&lt;LIKE_THIS&gt;</span> is a placeholder you replace.
   Checkboxes save locally, so you can close this page and pick up where you left off.
 </p>
@@ -81,7 +82,7 @@
   <a href="#s1">1 Account</a><a href="#s2">2 Secure root</a><a href="#s3">3 Admin identity</a>
   <a href="#s4">4 Budget alarm</a><a href="#s5">5 CLI</a><a href="#s6">6 CDK bootstrap</a>
   <a href="#s7">7 Deploy dev</a><a href="#s8">8 First admin</a><a href="#s9">9 Seed &amp; verify</a>
-  <a href="#s10">10 CI/CD role</a><a href="#s11">Troubleshooting</a>
+  <a href="#s10">10 CI/CD role</a><a href="#s11">11 Production</a><a href="#s12">Troubleshooting</a>
 </nav>
 
 <!-- 1 -->
@@ -204,7 +205,7 @@ aws cognito-idp admin-create-user --user-pool-id "$POOL_ID" \
 
 aws cognito-idp admin-add-user-to-group --user-pool-id "$POOL_ID" \
   --username &lt;YOUR_EMAIL&gt; --group-name admin</code></pre>
-  <p>Cognito emails you a temporary password. Now open <span class="ph">&lt;ADMIN_URL&gt;</span> and sign in:</p>
+  <p>Cognito emails you a temporary password (it sits alone on its own line in the email — copy exactly that; it is valid for 7 days). Now open <span class="ph">&lt;ADMIN_URL&gt;</span> and sign in:</p>
   <ol>
     <li>Email + the temporary password from the email.</li>
     <li>Set your real password (14+ chars, upper/lower/digit/symbol).</li>
@@ -228,8 +229,9 @@ npx tsx scripts/seed.ts --env dev
   <p>Verification checklist:</p>
   <ul>
     <li><b>Admin app</b> (<span class="ph">&lt;ADMIN_URL&gt;</span>): the "Brian" search appears; Listings shows 8 rows; publish toggles work; upload a photo on one listing.</li>
-    <li><b>Invite a client</b>: Search → Members → invite an email you control (role <i>client</i>).</li>
+    <li><b>Invite a client</b>: Search → Members → invite an email you control (role <i>client</i>). The toast tells you what happened: a new account with an emailed temporary password, a re-sent invitation for an address that never signed in, or plain access for an existing account (no email).</li>
     <li><b>Customer app</b> (<span class="ph">&lt;CUSTOMER_URL&gt;</span>): sign in with the emailed temp password → set your own → the board renders with the artifact design; rate a listing; post a comment.</li>
+    <li><b>Link import</b>: Listings → Link inbox → paste a portal URL → Import. Watch the house get built; the draft opens in the editor. Without the AI key the text stays German and the warning says so; without the proxy, ImmobilienScout24/Kleinanzeigen report "blocked" and offer the paste fallback. Both keys are stored in step 11.</li>
     <li><b>Tracking loop</b>: back in the admin app → Engagement — your clicks from the customer app show up (expands, photo views), and Dashboard shows "last client activity".</li>
   </ul>
   <label class="donebox"><input type="checkbox" data-done="s9"> Mark step 9 done</label>
@@ -313,6 +315,50 @@ gh api -X PUT repos/justinmccoy/realtor/environments/production</code></pre>
 
 <!-- 11 -->
 <section class="step" id="s11">
+  <div class="step-h"><span class="n">11</span><h2>Go to production</h2><span class="time">~45 min + DNS wait</span></div>
+  <p>Prod is the same stacks under <code>JJ-prod-*</code>. It comes into existence the first time you approve the production step of a Deploy run (Actions → the run → <b>Review deployments</b> → production → Approve). Then, in this order:</p>
+
+  <p><b>11a — Custom domains.</b> Create a public hosted zone and delegate your domain to it at the registrar:</p>
+<pre><code>aws route53 create-hosted-zone --name genauhere.de \
+  --caller-reference "genauhere-$(date +%s)"
+aws route53 get-hosted-zone --id &lt;ZONE_ID&gt; --query DelegationSet.NameServers
+# → enter those four nameservers at the registrar (Squarespace Domains: DNS → custom nameservers)
+dig +short NS genauhere.de     # wait until this shows the awsdns names</code></pre>
+  <div class="warn">Moving the nameservers moves <em>all</em> DNS for the domain. Recreate any records you need (mail MX, etc.) in the zone first. And don't put the domain block below into <code>cdk.json</code> before the zone exists: the Edge stack looks the zone up at synth time, and a missing zone blocks the whole prod deploy.</div>
+  <p>Once delegation is live, set the prod block in <code>infra/cdk.json</code> → <code>environments.prod</code>:</p>
+<pre><code>"domain": {
+  "zoneName": "genauhere.de",
+  "customer": "genauhere.de",
+  "customerAliases": ["www.genauhere.de"],
+  "admin": "admin.genauhere.de"
+},
+"notify": {
+  "customerUrl": "https://genauhere.de",
+  "adminUrl": "https://admin.genauhere.de",
+  ...
+}</code></pre>
+  <p>Merge, approve the production deploy, and allow 20–30 minutes: ACM validates the certificates through the zone, CloudFront picks up the names, the A records are written, CORS and Cognito's email links switch to the new hostnames. Verify from a terminal (your own machine may cache old DNS for hours — a phone on mobile data is the quickest second opinion):</p>
+<pre><code>dig +short genauhere.de @1.1.1.1          # CloudFront addresses
+curl -sI https://www.genauhere.de/ | head -1   # HTTP/2 200
+curl -sI https://admin.genauhere.de/ | head -1</code></pre>
+
+  <p><b>11b — First admin on the prod pool.</b> Same as step 8 with <code>--stack-name JJ-prod-Auth</code>.</p>
+
+  <p><b>11c — AI extraction and the fetch proxy.</b> Get an Anthropic key from the <a href="https://console.anthropic.com/" target="_blank" rel="noopener">Claude Console</a> (Settings → API Keys → Create Key; billing must be set up) and a ScrapingBee key from its dashboard. Store both in the secrets the Listing stack created — the raw key only, no quotes or JSON:</p>
+<pre><code>aws secretsmanager put-secret-value \
+  --secret-id jj/prod/listing-import/ai-api-key --secret-string "sk-ant-…"
+aws secretsmanager put-secret-value \
+  --secret-id jj/prod/listing-import/proxy-api-key --secret-string "&lt;SCRAPINGBEE_KEY&gt;"</code></pre>
+  <p>They take effect within a minute, no redeploy. The proxy URL template is already set for prod in <code>cdk.json</code> (ScrapingBee with JS rendering and German proxies). Test with one link import from the admin app: the draft should read in English and the import summary should say the page came via proxy.</p>
+
+  <p><b>11d — Email at volume (optional, later).</b> Cognito's built-in mailer sends the invitations and password resets from <code>no-reply@verificationemail.com</code>, capped at 50 a day and often filed as spam. When there are more than a handful of clients, verify a sender address in SES, set <code>notify.mailFrom</code> (and <code>notify.adminEmail</code> for JJ's activity notifications) in <code>cdk.json</code>, and redeploy.</p>
+
+  <div class="ok">Done when all three hostnames serve the apps over HTTPS, you can sign in to admin.genauhere.de with MFA, an invited client receives their email, and a link import comes back in English.</div>
+  <label class="donebox"><input type="checkbox" data-done="s11"> Mark step 11 done</label>
+</section>
+
+<!-- 12 -->
+<section class="step" id="s12">
   <div class="step-h"><span class="n">⚑</span><h2>Troubleshooting</h2></div>
   <table>
     <tr><th>Symptom</th><th>Fix</th></tr>
@@ -321,7 +367,14 @@ gh api -X PUT repos/justinmccoy/realtor/environments/production</code></pre>
     <tr><td><code>deploy</code>: <code>…is not bootstrapped</code> mentioning <b>us-east-1</b></td><td>Run the second bootstrap command from step 6 — the Edge stack lives in us-east-1.</td></tr>
     <tr><td>Frontend loads but shows "Missing configuration"</td><td>You opened a local dev build without <code>.env.local</code>. The deployed CloudFront URLs are configured by <code>deploy-frontends.sh</code>; re-run it after infra changes.</td></tr>
     <tr><td>Admin sign-in OK but every page errors 403</td><td>User isn't in the <code>admin</code> group — step 8's second command.</td></tr>
-    <tr><td>Invite email never arrives</td><td>Check spam. Cognito's default mailer is fine at this scale; resend by re-inviting the same email (idempotent).</td></tr>
+    <tr><td>Invite email never arrives</td><td>Check spam first. Re-invite the same address from the admin app: if they never signed in, a fresh temporary password is emailed; if the toast says "already have an account", the person can sign in with their existing password. Cognito's default mailer stops at 50 emails a day — move to SES (step 11d) before that matters.</td></tr>
+    <tr><td>"Forgot password" says a code was sent, nothing arrives</td><td>Most likely the address was invited but never signed in: Cognito can't reset an account still on its temporary password and, with user-existence errors hidden, reports success anyway. Re-invite them instead. Otherwise check the spelling of the address and the spam folder.</td></tr>
+    <tr><td>Link import says "AI extraction is not configured" after storing the key</td><td>The secret value must start with <code>sk-ant-</code> and be the bare key. Wait a minute (the Lambda re-checks missing keys every 60 s) and try again.</td></tr>
+    <tr><td>Import reports "blocked" for ImmobilienScout24 / Kleinanzeigen</td><td>The proxy isn't active: the message says if the proxy key is missing (step 11c), or the <code>proxyUrlTemplate</code> for that environment is empty in <code>cdk.json</code>. Until then use "Paste the page text instead".</td></tr>
+    <tr><td>Import stays on "Clearing the plot" and times out</td><td>The worker never picked up the job: check the <code>listing-import-worker</code> Lambda's logs and the EventBridge rule in the Listing stack. The draft is <em>not</em> created in that case; retry.</td></tr>
+    <tr><td>Prod deploy fails at "Found zones: [] for dns:…"</td><td>The domain block was deployed before the Route53 zone existed or before delegation. Create the zone (step 11a) — or temporarily set <code>"domain": null</code> — and rerun.</td></tr>
+    <tr><td>GitHub Actions runs sit "queued" for minutes with no runner</td><td>Usually a GitHub incident — check <a href="https://www.githubstatus.com" target="_blank" rel="noopener">githubstatus.com</a>. Nothing in the repo blocks them; <code>gh run rerun &lt;id&gt;</code> if one is still stuck afterwards.</td></tr>
+    <tr><td>Several Deploy runs waiting for production approval</td><td>Approve only the newest; it contains the earlier merges, and the prod jobs share a concurrency group so they would otherwise run one after another.</td></tr>
     <tr><td>GitHub deploy job: <code>Not authorized to perform sts:AssumeRoleWithWebIdentity</code></td><td>Trust policy <code>sub</code> must match <code>repo:justinmccoy/realtor:*</code> exactly; OIDC provider from 10a must exist.</td></tr>
     <tr><td>Nuke everything (dev)</td><td><code>pnpm --filter @jj/infra exec cdk destroy -c env=dev --all</code></td></tr>
   </table>
@@ -332,7 +385,8 @@ gh api -X PUT repos/justinmccoy/realtor/environments/production</code></pre>
   <table>
     <tr><th>Environment</th><th>Monthly</th><th>Drivers</th></tr>
     <tr><td>dev only (steps 1–9)</td><td>~$2–3</td><td>CloudWatch logs; everything else free-tier at this traffic</td></tr>
-    <tr><td>dev + prod</td><td>~$20</td><td>+WAF ($11), prod log retention, CloudFront</td></tr>
+    <tr><td>dev + prod</td><td>~$20</td><td>+WAF ($11), prod log retention, CloudFront, Route53 zone ($0.50), 4 secrets ($1.60)</td></tr>
+    <tr><td>per use</td><td>cents</td><td>AI extraction a few cents per imported listing; ScrapingBee per fetched page on its own plan</td></tr>
   </table>
   <p>Dev can be destroyed when idle and redeployed in ~15 minutes — nothing but the data is lost, and the seed script restores that.</p>
 </section>
