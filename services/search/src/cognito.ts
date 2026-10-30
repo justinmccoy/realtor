@@ -7,7 +7,7 @@ import {
   type AttributeType,
   type UserType
 } from "@aws-sdk/client-cognito-identity-provider";
-import { ApiError } from "@jj/shared";
+import { ApiError, type InvitationOutcome } from "@jj/shared";
 import { logger } from "@jj/lambda-kit";
 
 let client: CognitoIdentityProviderClient | undefined;
@@ -84,13 +84,17 @@ function sub(attrs: AttributeType[] | undefined): string {
 
 /**
  * Create the customer-pool user for an invited client (Cognito emails the
- * temporary password), or reuse the existing account for that email.
+ * temporary password), or reuse the existing account for that email. An
+ * account that was invited before but never signed in gets its invitation
+ * sent again with a fresh temporary password: the first email may have been
+ * lost, or the password expired (they last 7 days), and silently doing
+ * nothing looked like "no email arrived".
  * Returns the Cognito sub, which is the userId everywhere in the system.
  */
 export async function ensureCustomerUser(
   email: string,
   displayName: string
-): Promise<{ userId: string; created: boolean }> {
+): Promise<{ userId: string; created: boolean; invitation: InvitationOutcome }> {
   const poolId = process.env.CUSTOMER_POOL_ID;
   if (!poolId) throw new ApiError(500, "internal", "CUSTOMER_POOL_ID not set");
   try {
@@ -107,13 +111,26 @@ export async function ensureCustomerUser(
       })
     );
     logger.info("invited new customer user", { email });
-    return { userId: sub(res.User?.Attributes), created: true };
+    return { userId: sub(res.User?.Attributes), created: true, invitation: "new" };
   } catch (err) {
     if (err instanceof UsernameExistsException) {
       const existing = await cognito().send(
         new AdminGetUserCommand({ UserPoolId: poolId, Username: email })
       );
-      return { userId: sub(existing.UserAttributes), created: false };
+      const userId = sub(existing.UserAttributes);
+      if (existing.UserStatus === "FORCE_CHANGE_PASSWORD") {
+        await cognito().send(
+          new AdminCreateUserCommand({
+            UserPoolId: poolId,
+            Username: email,
+            MessageAction: "RESEND",
+            DesiredDeliveryMediums: ["EMAIL"]
+          })
+        );
+        logger.info("re-sent customer invitation", { email });
+        return { userId, created: false, invitation: "resent" };
+      }
+      return { userId, created: false, invitation: "existing" };
     }
     throw err;
   }

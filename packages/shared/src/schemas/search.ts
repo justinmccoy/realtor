@@ -70,3 +70,17 @@ export const inviteSchema = z.object({
   role: z.enum(MEMBER_ROLES).default("client")
 });
 export type InviteInput = z.infer<typeof inviteSchema>;
+
+/** What inviting an address did on the Cognito side:
+ *  - "new": account created, Cognito emailed a temporary password
+ *  - "resent": the address was invited before but never signed in, so a
+ *    fresh temporary password was emailed
+ *  - "existing": the person already has a working account; no email */
+export const INVITATION_OUTCOMES = ["new", "resent", "existing"] as const;
+export type InvitationOutcome = (typeof INVITATION_OUTCOMES)[number];
+
+/** Response of the invite endpoints: the member plus how the invite went. */
+export type InviteResult = Member & {
+  accountCreated: boolean;
+  invitation: InvitationOutcome;
+};

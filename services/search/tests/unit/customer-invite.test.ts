@@ -73,7 +73,11 @@ describe("POST /searches/{searchId}/members (client invite)", () => {
         lastSeenAt: null
       })
     );
-    ensureCustomerUser.mockResolvedValue({ userId: "sub-new", created: true });
+    ensureCustomerUser.mockResolvedValue({
+      userId: "sub-new",
+      created: true,
+      invitation: "new"
+    });
     publishEvents.mockResolvedValue(undefined);
   });
 
@@ -89,7 +93,8 @@ describe("POST /searches/{searchId}/members (client invite)", () => {
       userId: "sub-new",
       email: "partner@example.com",
       role: "viewer",
-      accountCreated: true
+      accountCreated: true,
+      invitation: "new"
     });
     expect(ensureCustomerUser).toHaveBeenCalledWith("partner@example.com", "Partner");
     expect(repo.putMember).toHaveBeenCalledTimes(1);
