@@ -83,20 +83,32 @@ export async function resolveFetchOptions(): Promise<FetchPageOptions> {
   };
 }
 
+/** Portals that always wall off cloud IPs: when a proxy is configured, don't
+ *  burn seconds on the direct attempt first. */
+const KNOWN_BLOCKED = /(^|\.)(immobilienscout24\.de|immoscout24\.de|kleinanzeigen\.de|ebay-kleinanzeigen\.de)$/i;
+
+/** Default budgets. The fetch runs in its own request (API Gateway allows
+ *  30 s), so the proxy gets most of it: a JS-rendered page through
+ *  residential proxies routinely takes 10–20 s. */
+export const DIRECT_TIMEOUT_MS = 6_000;
+export const PROXY_TIMEOUT_MS = 22_000;
+export const PROXY_ONLY_TIMEOUT_MS = 27_000;
+
 export async function fetchListingPage(
   url: string,
   opts: FetchPageOptions = {}
 ): Promise<FetchedPage> {
   const host = new URL(url).hostname;
-  const mode = opts.mode ?? "auto";
   const proxy = opts.proxyTemplate;
+  let mode = opts.mode ?? "auto";
+  if (mode === "auto" && proxy && KNOWN_BLOCKED.test(host)) mode = "proxy";
   let directStatus: number | undefined;
   let directError: string | undefined;
 
   if (mode !== "proxy" || !proxy) {
     try {
       const res = await safeFetch(url, {
-        timeoutMs: opts.directTimeoutMs ?? 7_000,
+        timeoutMs: opts.directTimeoutMs ?? DIRECT_TIMEOUT_MS,
         maxBytes: MAX_PAGE_BYTES,
         onOverflow: "truncate",
         headers: BROWSER_HEADERS
@@ -119,12 +131,26 @@ export async function fetchListingPage(
     const proxied = proxy.includes("{url}")
       ? proxy.replace("{url}", encodeURIComponent(url))
       : `${proxy}${proxy.includes("?") ? "&" : "?"}url=${encodeURIComponent(url)}`;
-    const res = await safeFetch(proxied, {
-      timeoutMs: opts.proxyTimeoutMs ?? 14_000,
-      maxBytes: MAX_PAGE_BYTES,
-      onOverflow: "truncate",
-      headers: { accept: BROWSER_HEADERS["accept"]! }
-    });
+    const timeoutMs =
+      opts.proxyTimeoutMs ?? (mode === "proxy" ? PROXY_ONLY_TIMEOUT_MS : PROXY_TIMEOUT_MS);
+    let res;
+    try {
+      res = await safeFetch(proxied, {
+        timeoutMs,
+        maxBytes: MAX_PAGE_BYTES,
+        onOverflow: "truncate",
+        headers: { accept: BROWSER_HEADERS["accept"]! }
+      });
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 504) {
+        throw new ApiError(
+          504,
+          "upstream_blocked",
+          `The fetch proxy did not return ${host} within ${Math.round(timeoutMs / 1000)} s (it renders the page in a real browser, which can be slow). Try the import again, or paste the page text.`
+        );
+      }
+      throw err;
+    }
     const html = res.body.toString("utf8");
     if (res.ok && html.length > 500) {
       return { html, finalUrl: url, via: "proxy", truncated: res.truncated };

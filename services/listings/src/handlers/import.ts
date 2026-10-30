@@ -52,7 +52,7 @@ function publicJob(job: ImportJob): ImportJob {
 
 /** The import itself, independent of how it was triggered. */
 async function importInto(
-  request: ImportJob["request"],
+  request: ImportJob["request"] & { fetchedVia?: "direct" | "proxy" },
   admin: AdminAuth,
   deps: ImportDeps
 ): Promise<ImportResult> {
@@ -62,7 +62,10 @@ async function importInto(
 
   let outcome;
   try {
-    outcome = await runImport({ url, content: request.content }, deps);
+    outcome = await runImport(
+      { url, content: request.content, fetchedVia: request.fetchedVia },
+      deps
+    );
   } catch (err) {
     if (source && err instanceof ApiError && err.code === "upstream_blocked") {
       await repo.updateSource(source.id, { status: "failed" });
@@ -148,7 +151,10 @@ export const handler = dispatch({
       if (body.sourceId && !(await repo.getSource(body.sourceId))) {
         throw ApiError.notFound("Inbox link");
       }
-      const job = await repo.createImportJob({ request: body, requestedBy });
+      const job = await repo.createImportJob({
+        request: { url: body.url, sourceId: body.sourceId },
+        requestedBy
+      });
       await publishEvents(EVENT_SOURCES.listing, {
         type: "listing.import.requested",
         actorId: admin.userId,

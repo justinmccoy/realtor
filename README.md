@@ -138,11 +138,12 @@ uploaded by hand. A link import runs as a background job: the API queues it
 budget fetches the page and calls the AI, and the admin app polls
 `GET /admin/import/{jobId}` while the import modal shows the house being
 built. Page fetch, proxy fallback and AI call each have their own timeout
-(`IMPORT_BUDGETS` in `services/listings/src/import/index.ts`) and degrade to
-"page markup only" rather than failing the import; a job that overruns is
-marked failed with a `timeout` error. Pasted text is read inline (≈25 s
-budget), since it only needs the AI call. Jobs expire from the table after a
-day.
+(`IMPORT_BUDGETS` in `services/listings/src/import/index.ts`); portals known
+to wall off cloud IPs skip the direct attempt and go straight to the proxy,
+and a slow or failed AI call degrades to "page markup only" rather than
+failing the import. A job that overruns is marked failed with a `timeout`
+error and can simply be retried. Pasted text is read inline (≈25 s budget),
+since it only needs the AI call. Jobs expire from the table after a day.
 
 ## First-time deployment
 

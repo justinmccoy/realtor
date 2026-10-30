@@ -22,8 +22,10 @@ import { parsePage, type Provenance } from "./parse.js";
 
 export interface ImportInput {
   url?: string;
-  /** Pasted page HTML or plain text (fallback when the portal blocks us). */
+  /** Page HTML or plain text supplied by the caller instead of fetching. */
   content?: string;
+  /** How a caller obtained `content`; unset means the admin pasted it. */
+  fetchedVia?: "direct" | "proxy";
 }
 
 export interface ImportOutcome {
@@ -89,7 +91,7 @@ export async function runImport(input: ImportInput, deps: ImportDeps): Promise<I
   let pageUrl = input.url;
 
   if (input.content !== undefined) {
-    fetchedVia = "paste";
+    fetchedVia = input.fetchedVia ?? "paste";
     if (looksLikeHtml(input.content)) {
       html = input.content;
       text = htmlToText(html);

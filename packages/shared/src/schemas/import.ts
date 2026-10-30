@@ -56,15 +56,21 @@ export const extractedListingSchema = listingCreateSchema
   .partial();
 export type ExtractedListing = z.infer<typeof extractedListingSchema>;
 
-export const MAX_IMPORT_CONTENT_CHARS = 2_000_000;
+/** Portal pages run to 1–3 MB of HTML when pasted whole. */
+export const MAX_IMPORT_CONTENT_CHARS = 4_000_000;
 
-/** Either a link to fetch, or pasted page content when the portal blocks
- *  automated requests. `sourceId` links the result back to an inbox entry. */
+/**
+ * Either a link to fetch (queued as a background job, see the job schemas
+ * below) or page content to read inline: text the admin pasted, or HTML a
+ * caller fetched itself, in which case `fetchedVia` says how. `sourceId`
+ * links the result back to an inbox entry.
+ */
 export const importRequestSchema = z
   .object({
     url: httpUrl.optional(),
     sourceId: z.string().ulid().optional(),
-    content: z.string().min(40).max(MAX_IMPORT_CONTENT_CHARS).optional()
+    content: z.string().min(40).max(MAX_IMPORT_CONTENT_CHARS).optional(),
+    fetchedVia: z.enum(["direct", "proxy"]).optional()
   })
   .refine((r) => r.url !== undefined || r.content !== undefined, {
     message: "Provide a url or pasted content"
