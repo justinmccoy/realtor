@@ -34,7 +34,9 @@ const aiOutputSchema = z.object({
   title: z
     .string()
     .nullable()
-    .describe("Short listing headline (max 120 chars) in the listing's language"),
+    .describe(
+      "Short listing headline in English (max 120 chars), e.g. \"Bright 3-room period flat with balcony in Prenzlauer Berg\""
+    ),
   bezirk: z
     .enum(DISTRICT_NAMES)
     .nullable()
@@ -57,35 +59,42 @@ const aiOutputSchema = z.object({
   floor: z
     .string()
     .nullable()
-    .describe('Floor as short text, e.g. "3. OG von 5" or "Erdgeschoss"'),
+    .describe('Floor as short English text, e.g. "3rd floor of 5" or "Ground floor"'),
   year: z
     .string()
     .nullable()
-    .describe('Year built, plus a short modernisation note if stated, e.g. "1908, saniert 2015"'),
+    .describe(
+      'Year built, plus a short modernisation note in English if stated, e.g. "1908, renovated 2015"'
+    ),
   hausgeld: z.number().nullable().describe("Monthly service charge (Hausgeld) in EUR"),
   provision: z
     .number()
     .nullable()
     .describe("Buyer's commission in percent; 0 when commission-free; null when not stated"),
   balcony: z.enum(BALCONY_STATES).describe("Whether there is a balcony, loggia or terrace"),
-  balconyNote: z.string().nullable().describe("Balcony/terrace details: orientation, size"),
+  balconyNote: z
+    .string()
+    .nullable()
+    .describe("Balcony/terrace details in English: orientation, size"),
   notes: z
     .string()
     .nullable()
     .describe(
-      "Other facts worth keeping that no field covers: condition, heating, energy class, lift, cellar, parking, rental status, availability, Hausgeld breakdown. Plain text, max 1200 chars, same language as the listing"
+      "Other facts worth keeping that no field covers: condition, heating, energy class, lift, cellar, parking, rental status, availability, service charge breakdown. Plain English text, max 1200 chars"
     )
 });
 
-const SYSTEM = `You extract structured data for a Berlin apartment purchase listing (Eigentumswohnung) from the text of a property portal page.
+const SYSTEM = `You extract structured data for a Berlin apartment purchase listing (Eigentumswohnung) from the text of a property portal page, for an English-speaking buyer.
 Rules:
 - Use only facts stated in the page text. Use null for anything not stated. Never guess numbers.
+- Write every text field in English. Pages are usually German: translate, do not copy. Keep proper nouns as they are (street names, Ortsteil, Bezirk, "Altbau"), and where a German real-estate term carries meaning, give the English with the German in parentheses the first time, e.g. "service charge (Hausgeld)", "commission-free (provisionsfrei)".
 - Numbers are plain numbers: EUR without separators for prices, m² for areas, percent for commission.
 - "bezirk" must be one of Berlin's 12 districts; derive it from the postcode or Ortsteil when the page only gives those. Berlin postcodes run 10115–14199.
 - Pages often also list other properties ("Ähnliche Objekte", adverts, agent portfolios). Describe only the main listing — the one presented first and in the most detail.
+- Always give a title: a short English headline for the main listing.
 - Keep text fields short and factual.`;
 
-let cachedKey: string | null | undefined;
+let cachedKey: string | undefined;
 
 async function resolveApiKey(): Promise<string | null> {
   if (cachedKey !== undefined) return cachedKey;
@@ -94,11 +103,16 @@ async function resolveApiKey(): Promise<string | null> {
     cachedKey = direct;
     return cachedKey;
   }
+  // Only a real key is remembered here; "no key yet" is left to the secret
+  // cache's short TTL so a newly stored key is picked up without a redeploy.
   const value = await readSecretFromEnv("AI_SECRET_ARN");
   // The stack created this secret with a random string before the placeholder
   // scheme existed, so the prefix check is what tells a real key apart.
-  cachedKey = value && value.startsWith("sk-ant-") ? value : null;
-  return cachedKey;
+  if (value && value.startsWith("sk-ant-")) {
+    cachedKey = value;
+    return cachedKey;
+  }
+  return null;
 }
 
 /** Forget the cached key (tests, key rotation within a warm container). */

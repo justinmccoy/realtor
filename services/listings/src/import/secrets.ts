@@ -11,10 +11,16 @@ import { logger } from "@jj/lambda-kit";
  * can be deployed before anyone has a key. A placeholder is the JSON the
  * stack generates (`{"placeholder":true,"nonce":"…"}`); anything else is
  * treated as the real value.
+ *
+ * A real value is kept for the life of the container. "No value yet" is only
+ * kept briefly, so storing a key takes effect within a minute instead of
+ * whenever Lambda happens to recycle the container.
  */
 
 const PLACEHOLDER_PREFIX = '{"placeholder"';
-const cache = new Map<string, string | null>();
+/** How long a missing/placeholder/unreadable result is trusted. */
+export const MISSING_SECRET_TTL_MS = 60_000;
+const cache = new Map<string, { value: string | null; until: number }>();
 let client: SecretsManagerClient | undefined;
 
 /** Value of the secret whose ARN is in `process.env[envName]`, or null when
@@ -24,7 +30,7 @@ export async function readSecretFromEnv(envName: string): Promise<string | null>
   const arn = process.env[envName];
   if (!arn) return null;
   const hit = cache.get(arn);
-  if (hit !== undefined) return hit;
+  if (hit && Date.now() < hit.until) return hit.value;
   let value: string | null = null;
   try {
     client ??= new SecretsManagerClient({});
@@ -34,7 +40,10 @@ export async function readSecretFromEnv(envName: string): Promise<string | null>
   } catch (err) {
     logger.warn("secret unavailable", { env: envName, error: (err as Error).message });
   }
-  cache.set(arn, value);
+  cache.set(arn, {
+    value,
+    until: value === null ? Date.now() + MISSING_SECRET_TTL_MS : Number.POSITIVE_INFINITY
+  });
   return value;
 }
 
