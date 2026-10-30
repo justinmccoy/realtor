@@ -1,5 +1,6 @@
-import { safeFetch } from "@jj/lambda-kit";
+import { logger, safeFetch } from "@jj/lambda-kit";
 import { ApiError } from "@jj/shared";
+import { readSecretFromEnv } from "./secrets.js";
 
 /**
  * Fetches a portal page. Direct requests from AWS address space are refused
@@ -19,7 +20,10 @@ export interface FetchedPage {
 }
 
 export interface FetchPageOptions {
+  /** Ready-to-use proxy URL template (key already substituted). */
   proxyTemplate?: string;
+  /** A proxy template is configured but its API key secret is still unset. */
+  proxyKeyMissing?: boolean;
   mode?: "auto" | "direct" | "proxy";
   directTimeoutMs?: number;
   proxyTimeoutMs?: number;
@@ -46,10 +50,35 @@ export function looksLikeBotWall(status: number, html: string): boolean {
   return BOT_WALL.test(head) && html.length < 80_000;
 }
 
-export function fetchOptionsFromEnv(): FetchPageOptions {
+/**
+ * Fills `{key}` in a proxy template with the provider's API key. The key
+ * never sits in cdk.json or a Lambda env var; it comes from Secrets Manager.
+ * Returns undefined when the template needs a key that is not available.
+ */
+export function applyProxyKey(
+  template: string | undefined,
+  key: string | null
+): string | undefined {
+  const t = template?.trim();
+  if (!t) return undefined;
+  if (!t.includes("{key}")) return t;
+  if (!key) return undefined;
+  return t.replaceAll("{key}", encodeURIComponent(key));
+}
+
+/** Env: IMPORT_PROXY_URL_TEMPLATE, PROXY_SECRET_ARN, IMPORT_FETCH_MODE. */
+export async function resolveFetchOptions(): Promise<FetchPageOptions> {
   const mode = process.env.IMPORT_FETCH_MODE;
+  const template = process.env.IMPORT_PROXY_URL_TEMPLATE?.trim() || undefined;
+  const key = template?.includes("{key}") ? await readSecretFromEnv("PROXY_SECRET_ARN") : null;
+  const proxyTemplate = applyProxyKey(template, key);
+  const proxyKeyMissing = Boolean(template && !proxyTemplate);
+  if (proxyKeyMissing) {
+    logger.warn("fetch proxy configured but its API key secret is still unset");
+  }
   return {
-    proxyTemplate: process.env.IMPORT_PROXY_URL_TEMPLATE?.trim() || undefined,
+    proxyTemplate,
+    proxyKeyMissing,
     mode: mode === "direct" || mode === "proxy" ? mode : "auto"
   };
 }
@@ -111,9 +140,12 @@ export async function fetchListingPage(
     directStatus !== undefined
       ? `HTTP ${directStatus}`
       : directError ?? "no response";
+  const proxyHint = opts.proxyKeyMissing
+    ? " A fetch proxy is configured but its API key has not been stored in Secrets Manager yet."
+    : "";
   throw new ApiError(
     422,
     "upstream_blocked",
-    `${host} refused the automated request (${why}). Open the page in your browser, select all, copy, and paste the text here instead.`
+    `${host} refused the automated request (${why}).${proxyHint} Open the page in your browser, select all, copy, and paste the text here instead.`
   );
 }

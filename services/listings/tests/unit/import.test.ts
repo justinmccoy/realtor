@@ -9,7 +9,7 @@ import {
 } from "../../src/import/html.js";
 import { cleanTitle, parseGermanNumber, parsePage } from "../../src/import/parse.js";
 import { canonicalOrtsteil, detectLocation } from "../../src/import/geo.js";
-import { looksLikeBotWall } from "../../src/import/fetchPage.js";
+import { applyProxyKey, looksLikeBotWall } from "../../src/import/fetchPage.js";
 import { runImport, type ImportDeps } from "../../src/import/index.js";
 
 const PORTAL_HTML = `<!doctype html><html><head>
@@ -194,6 +194,28 @@ describe("parsePage", () => {
       ortsteil: "Friedrichshain"
     });
     expect(fields.title).toBeUndefined();
+  });
+});
+
+describe("applyProxyKey", () => {
+  const tpl = "https://app.scrapingbee.com/api/v1/?api_key={key}&render_js=true&url={url}";
+
+  it("substitutes and URL-encodes the key", () => {
+    expect(applyProxyKey(tpl, "abc 123")).toBe(
+      "https://app.scrapingbee.com/api/v1/?api_key=abc%20123&render_js=true&url={url}"
+    );
+  });
+
+  it("disables the proxy when the template needs a key that is missing", () => {
+    expect(applyProxyKey(tpl, null)).toBeUndefined();
+    expect(applyProxyKey("", "k")).toBeUndefined();
+    expect(applyProxyKey(undefined, "k")).toBeUndefined();
+  });
+
+  it("passes key-less templates through untouched", () => {
+    expect(applyProxyKey(" https://proxy.example/?url={url} ", null)).toBe(
+      "https://proxy.example/?url={url}"
+    );
   });
 });
 
