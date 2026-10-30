@@ -298,6 +298,25 @@ describe("runImport", () => {
     expect(unknown.fields.title).toBe("Imported listing");
   });
 
+  it("treats pre-fetched HTML like a fetched page, keeping how it was fetched", async () => {
+    const out = await runImport(
+      {
+        url: "https://www.immobilienscout24.de/expose/123456",
+        content: PORTAL_HTML,
+        fetchedVia: "proxy"
+      },
+      deps({
+        fetchPage: async () => {
+          throw new Error("must not fetch when content is supplied");
+        }
+      })
+    );
+    expect(out.fetchedVia).toBe("proxy");
+    expect(out.portal).toBe("immobilienscout24.de");
+    expect(out.fields.price).toBe(489000);
+    expect(out.photoUrls.length).toBeGreaterThanOrEqual(5);
+  });
+
   it("survives an AI failure", async () => {
     const out = await runImport(
       { url: "https://www.immobilienscout24.de/expose/123456" },

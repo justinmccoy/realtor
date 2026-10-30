@@ -142,6 +142,12 @@ export class ListingStack extends Stack {
       integration: importInt,
       authorizer: adminAuthorizer
     });
+    httpApi.addRoutes({
+      path: "/api/v1/admin/import/fetch",
+      methods: [HttpMethod.POST],
+      integration: importInt,
+      authorizer: adminAuthorizer
+    });
 
     httpApi.addRoutes({
       path: "/api/v1/admin/listings",

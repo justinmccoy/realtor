@@ -9,21 +9,58 @@ import {
 import {
   ApiError,
   EVENT_SOURCES,
+  importFetchRequestSchema,
   importRequestSchema,
   listingCreateSchema,
   type FieldProvenance,
+  type ImportFetchResult,
   type ImportResult
 } from "@jj/shared";
+import { fetchListingPage, resolveFetchOptions } from "../import/fetchPage.js";
 import { defaultDeps, runImport } from "../import/index.js";
 import * as repo from "../repo.js";
 
+function portalOf(url: string): string | null {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return null;
+  }
+}
+
 /**
- * Link → draft listing. Runs in its own Lambda because one import chains a
- * page fetch (possibly via proxy) and an AI call; the admin route Lambda keeps
- * its short timeout. Photos are imported afterwards by the media service,
- * batch by batch, from the URLs returned here.
+ * Link → draft listing, in two requests so each fits API Gateway's 30 s
+ * window: `import/fetch` gets the page (a proxied, JS-rendered fetch alone
+ * can take 20 s), then `import` extracts fields, calls the AI model and
+ * creates the draft from that HTML. Photos are imported afterwards by the
+ * media service, batch by batch, from the URLs returned here.
  */
 export const handler = dispatch({
+  "POST /api/v1/admin/import/fetch": apiHandler({
+    body: importFetchRequestSchema,
+    fn: async ({ body, event }) => {
+      adminAuth(event);
+      const source = body.sourceId ? await repo.getSource(body.sourceId) : null;
+      if (body.sourceId && !source) throw ApiError.notFound("Inbox link");
+      try {
+        const page = await fetchListingPage(body.url, await resolveFetchOptions());
+        const result: ImportFetchResult = {
+          html: page.html,
+          finalUrl: page.finalUrl,
+          via: page.via,
+          truncated: page.truncated,
+          portal: portalOf(page.finalUrl)
+        };
+        return { body: result };
+      } catch (err) {
+        if (source && err instanceof ApiError && err.code === "upstream_blocked") {
+          await repo.updateSource(source.id, { status: "failed" });
+        }
+        throw err;
+      }
+    }
+  }),
+
   "POST /api/v1/admin/import": apiHandler({
     body: importRequestSchema,
     fn: async ({ body, event }) => {
@@ -34,7 +71,10 @@ export const handler = dispatch({
 
       let outcome;
       try {
-        outcome = await runImport({ url, content: body.content }, defaultDeps());
+        outcome = await runImport(
+          { url, content: body.content, fetchedVia: body.fetchedVia },
+          defaultDeps()
+        );
       } catch (err) {
         if (source && err instanceof ApiError && err.code === "upstream_blocked") {
           await repo.updateSource(source.id, { status: "failed" });

@@ -21,8 +21,10 @@ import { parsePage, type Provenance } from "./parse.js";
 
 export interface ImportInput {
   url?: string;
-  /** Pasted page HTML or plain text (fallback when the portal blocks us). */
+  /** Page HTML from the fetch step, or text the admin pasted. */
   content?: string;
+  /** How the fetch step obtained `content`; unset means it was pasted. */
+  fetchedVia?: "direct" | "proxy";
 }
 
 export interface ImportOutcome {
@@ -47,7 +49,9 @@ export function defaultDeps(): ImportDeps {
     // Resolved per call: the proxy key comes from Secrets Manager (cached).
     fetchPage: async (url) => fetchListingPage(url, await resolveFetchOptions()),
     ai: extractWithAi,
-    aiTimeoutMs: 13_000
+    // Extraction runs in its own request now (the page arrives pre-fetched),
+    // so the model gets most of the 30 s window.
+    aiTimeoutMs: 22_000
   };
 }
 
@@ -72,7 +76,7 @@ export async function runImport(input: ImportInput, deps: ImportDeps): Promise<I
   let pageUrl = input.url;
 
   if (input.content !== undefined) {
-    fetchedVia = "paste";
+    fetchedVia = input.fetchedVia ?? "paste";
     if (looksLikeHtml(input.content)) {
       html = input.content;
       text = htmlToText(html);

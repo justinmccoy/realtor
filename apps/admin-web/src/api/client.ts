@@ -6,6 +6,7 @@ import type {
   HoursCreateInput,
   HoursEntry,
   HoursUpdateInput,
+  ImportFetchResult,
   ImportRequest,
   ImportResult,
   InviteInput,
@@ -198,7 +199,10 @@ export const api = {
   deleteInbox: (sourceId: string) =>
     call<void>(`/admin/inbox/${sourceId}`, { method: "DELETE" }),
 
-  /* link import → draft listing (+ photos downloaded by the media service) */
+  /* link import: fetch the page, then extract → draft listing (+ photos
+     downloaded by the media service) */
+  fetchImportPage: (url: string, sourceId?: string) =>
+    call<ImportFetchResult>("/admin/import/fetch", { method: "POST", body: { url, sourceId } }),
   importListing: (body: ImportRequest) =>
     call<ImportResult>("/admin/import", { method: "POST", body }),
   importPhotos: (lid: string, kind: PhotoKind, urls: string[]) =>
