@@ -3,36 +3,13 @@ import type { Rating } from "@jj/shared";
 import { api } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 
-function Stars({
-  score,
-  onPick
-}: {
-  score: number;
-  onPick?: (v: number) => void;
-}) {
-  return (
-    <span className="stars">
-      {[1, 2, 3, 4, 5].map((i) =>
-        onPick ? (
-          <button
-            key={i}
-            type="button"
-            className={`star${i <= score ? " on" : ""}`}
-            aria-label={`${i} star${i > 1 ? "s" : ""}`}
-            onClick={() => onPick(i)}
-          >
-            ★
-          </button>
-        ) : (
-          <span key={i} className={`star${i <= Math.round(score) ? " on" : ""}`}>
-            ★
-          </span>
-        )
-      )}
-    </span>
-  );
-}
-
+/**
+ * Rating section on the listing page.
+ * Members with edit access rate in place: hover previews a score, a click
+ * saves it (the same interaction as the stars on the board tiles). Any
+ * comment they left before is preserved. Viewers get read-only stars
+ * showing the average.
+ */
 export function RatingBlock({
   searchId,
   listingId,
@@ -59,21 +36,23 @@ export function RatingBlock({
     ? forListing.reduce((a, r) => a + r.score, 0) / forListing.length
     : 0;
 
-  const [pick, setPick] = useState(0);
-  const [comment, setComment] = useState(mine?.comment ?? "");
+  const [hover, setHover] = useState(0);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
 
-  async function save() {
-    const score = pick || mine?.score || 0;
-    if (!score) {
-      setMsg("Pick 1 to 5 stars first");
-      return;
-    }
+  // Editors see their own score (hover previews a new one); viewers see the average.
+  const live = canRate ? hover || mine?.score || 0 : Math.round(avg);
+
+  const summary = forListing.length
+    ? `${avg.toFixed(1)} · ${forListing.length} rating${forListing.length > 1 ? "s" : ""}`
+    : "No ratings yet";
+
+  async function pick(score: number) {
+    if (busy) return;
     setBusy(true);
     setMsg("");
     try {
-      await api.putRating(searchId, listingId, { score, comment: comment.trim() });
+      await api.putRating(searchId, listingId, { score, comment: mine?.comment ?? "" });
       onChanged();
       setMsg("Rating saved");
     } catch (e) {
@@ -84,12 +63,14 @@ export function RatingBlock({
   }
 
   async function remove() {
+    if (busy) return;
     setBusy(true);
+    setMsg("");
     try {
       await api.removeRating(searchId, listingId);
-      setPick(0);
-      setComment("");
       onChanged();
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : "Couldn't remove your rating");
     } finally {
       setBusy(false);
     }
@@ -98,20 +79,59 @@ export function RatingBlock({
   return (
     <div className="rating">
       <div
-        className="stars"
+        className={`stars${busy ? " saving" : ""}`}
+        role={canRate ? "group" : undefined}
         aria-label={
-          forListing.length
-            ? `Average ${avg.toFixed(1)} of 5 from ${forListing.length} rating${forListing.length > 1 ? "s" : ""}`
-            : "No ratings yet"
+          canRate
+            ? `Rate this apartment. ${summary}${mine ? `, yours ${mine.score}` : ""}`
+            : summary
         }
+        onMouseLeave={() => setHover(0)}
       >
-        <Stars score={avg} />
-        <span className="rlabel">
-          {forListing.length
-            ? `${avg.toFixed(1)} · ${forListing.length} rating${forListing.length > 1 ? "s" : ""}`
-            : "No ratings yet"}
-        </span>
+        {[1, 2, 3, 4, 5].map((i) =>
+          canRate ? (
+            <button
+              key={i}
+              type="button"
+              className={`star${i <= live ? " on" : ""}`}
+              aria-label={`${i} star${i > 1 ? "s" : ""}`}
+              aria-pressed={mine?.score === i}
+              disabled={busy}
+              onMouseEnter={() => setHover(i)}
+              onFocus={() => setHover(i)}
+              onBlur={() => setHover(0)}
+              onClick={() => void pick(i)}
+            >
+              ★
+            </button>
+          ) : (
+            <span key={i} className={`star${i <= live ? " on" : ""}`} aria-hidden="true">
+              ★
+            </span>
+          )
+        )}
+        <span className="rlabel">{summary}</span>
+        {canRate && mine && (
+          <button
+            className="btn ghost danger rbtn"
+            type="button"
+            disabled={busy}
+            onClick={() => void remove()}
+          >
+            Remove my rating
+          </button>
+        )}
       </div>
+      {canRate && (
+        <p className="note-line" style={{ margin: 0 }} aria-live="polite">
+          {msg || (mine ? "Click a star to change your rating." : "Click a star to rate.")}
+        </p>
+      )}
+      {!canRate && (
+        <p className="note-line" style={{ margin: 0 }}>
+          You have view-only access, so you can see ratings but not add your own.
+        </p>
+      )}
 
       {others.length > 0 && (
         <ul className="rlist">
@@ -129,46 +149,6 @@ export function RatingBlock({
             </li>
           ))}
         </ul>
-      )}
-
-      {canRate ? (
-        <details className="myrate">
-          <summary>{mine ? "Change your rating" : "Rate this apartment"}</summary>
-          <Stars score={pick || mine?.score || 0} onPick={setPick} />
-          <textarea
-            aria-label="Your comment"
-            placeholder="What do you think?"
-            value={comment}
-            onChange={(e) => setComment(e.target.value)}
-          />
-          <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
-            {msg && <span className="note-line">{msg}</span>}
-            {mine && (
-              <button
-                className="btn ghost danger"
-                type="button"
-                disabled={busy}
-                onClick={() => void remove()}
-              >
-                Remove
-              </button>
-            )}
-            <button
-              className="btn primary"
-              type="button"
-              disabled={busy}
-              onClick={() => void save()}
-            >
-              Save rating
-            </button>
-          </div>
-        </details>
-      ) : (
-        <div className="myrate">
-          <p className="note-line" style={{ margin: 0 }}>
-            You have view-only access, so you can see ratings but not add your own.
-          </p>
-        </div>
       )}
     </div>
   );
