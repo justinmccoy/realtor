@@ -115,29 +115,24 @@ export const handler = dispatch({
     }
   }),
 
-  /** Soft delete keeps thread structure; body is blanked. */
+  /** Removes the comment (and, for a root, its replies) outright. Nothing
+   *  marks the gap in either app; only the audit log keeps the record. */
   "DELETE /api/v1/admin/searches/{searchId}/comments/{commentId}": apiHandler({
     path: commentPath,
     fn: async ({ path, event }) => {
       const admin = adminAuth(event);
-      const redacted = await repo.softDeleteComment(path.searchId, path.commentId);
+      const { removed, replies } = await repo.deleteComment(path.searchId, path.commentId);
+      const withReplies =
+        replies.length === 0
+          ? ""
+          : ` and ${replies.length} ${replies.length === 1 ? "reply" : "replies"}`;
       await publishAdminAction(EVENT_SOURCES.engagement, admin, {
         action: "delete",
         entity: "comment",
-        entityId: redacted.id,
+        entityId: removed.id,
         searchId: path.searchId,
-        summary: `Deleted a comment by ${redacted.authorName}`
-      });
-      await publishEvents(EVENT_SOURCES.engagement, {
-        type: "comment.deleted",
-        searchId: path.searchId,
-        listingId: redacted.listingId ?? undefined,
-        actorId: admin.userId,
-        actorName: admin.displayName,
-        actorRole: "admin",
-        at: nowIso(),
-        summary: "Comment removed",
-        payload: { commentId: redacted.id }
+        summary: `Deleted a comment by ${removed.authorName}${withReplies}`,
+        before: { comment: removed, replies }
       });
       return { status: 204 };
     }

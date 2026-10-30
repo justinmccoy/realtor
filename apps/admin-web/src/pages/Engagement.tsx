@@ -127,13 +127,8 @@ export function Engagement({ searchId }: { searchId: string }) {
                   <span className="muted"> · {title(c.listingId)} · {fmtWhen(c.createdAt)}</span>
                   {c.parentId && <span className="muted"> · reply</span>}
                 </span>
-                {c.deletedAt ? (
-                  <span className="muted">(removed)</span>
-                ) : (
-                  <span style={{ whiteSpace: "pre-wrap" }}>{c.body}</span>
-                )}
-                {!c.deletedAt && (
-                  <span className="row-actions" style={{ justifyContent: "flex-start" }}>
+                <span style={{ whiteSpace: "pre-wrap" }}>{c.body}</span>
+                <span className="row-actions" style={{ justifyContent: "flex-start" }}>
                     <input
                       style={{ flex: 1, minWidth: 160 }}
                       placeholder="Reply as JJ…"
@@ -163,13 +158,12 @@ export function Engagement({ searchId }: { searchId: string }) {
                     <DangerButton
                       onConfirm={() =>
                         void api.deleteComment(searchId, c.id).then(() => {
-                          toast("Comment removed");
+                          toast(c.parentId ? "Reply removed" : "Comment and its replies removed");
                           return reload();
                         })
                       }
                     />
-                  </span>
-                )}
+                </span>
               </li>
             ))}
           </ul>

@@ -96,9 +96,8 @@ export function Clients({
             avgScore: mine.length
               ? mine.reduce((a, r) => a + r.score, 0) / mine.length
               : null,
-            commentsPosted: comments.items.filter(
-              (c) => c.authorId === member.userId && !c.deletedAt
-            ).length,
+            commentsPosted: comments.items.filter((c) => c.authorId === member.userId)
+              .length,
             events30d
           });
         }

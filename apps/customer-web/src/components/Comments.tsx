@@ -19,12 +19,8 @@ function CommentItem({
         {c.authorRole === "admin" && <span className="role">JJ</span>}
         <span className="when">{fmtWhen(c.createdAt)}</span>
       </span>
-      {c.deletedAt ? (
-        <p className="deleted">Comment removed</p>
-      ) : (
-        <p>{c.body}</p>
-      )}
-      {canReply && !c.parentId && !c.deletedAt && (
+      <p>{c.body}</p>
+      {canReply && !c.parentId && (
         <button className="btn ghost" type="button" onClick={() => onReply(c)}>
           Reply
         </button>
