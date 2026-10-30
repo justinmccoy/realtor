@@ -5,3 +5,4 @@ export * from "./handler.js";
 export * from "./router.js";
 export * from "./events.js";
 export * from "./ids.js";
+export * from "./fetch.js";

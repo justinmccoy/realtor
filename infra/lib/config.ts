@@ -30,6 +30,14 @@ export interface AppConfig {
     customerUrl?: string;
     adminUrl?: string;
   };
+  /** Admin "import listing from link" feature. */
+  listingImport: {
+    /** Scraping-proxy URL template containing `{url}` (the encoded target).
+     *  Unset = direct fetches only, which the big portals usually block. */
+    proxyUrlTemplate?: string;
+    /** Model id for AI field extraction; unset = service default. */
+    aiModel?: string;
+  };
 }
 
 export function getConfig(app: App): AppConfig {
@@ -51,6 +59,7 @@ export function getConfig(app: App): AppConfig {
       customerUrl?: string;
       adminUrl?: string;
     };
+    listingImport?: { proxyUrlTemplate?: string; aiModel?: string };
   };
   return {
     envName,
@@ -62,7 +71,11 @@ export function getConfig(app: App): AppConfig {
     alarmEmail: raw.alarmEmail || undefined,
     domain: raw.domain ?? undefined,
     devOrigins: ["http://localhost:5173", "http://localhost:5174"],
-    notify: raw.notify ?? {}
+    notify: raw.notify ?? {},
+    listingImport: {
+      proxyUrlTemplate: raw.listingImport?.proxyUrlTemplate || undefined,
+      aiModel: raw.listingImport?.aiModel || undefined
+    }
   };
 }
 

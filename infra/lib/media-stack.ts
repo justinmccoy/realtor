@@ -69,7 +69,10 @@ export class MediaStack extends Stack {
       serviceName: "media-admin",
       entry: "services/media/src/handlers/admin.ts",
       description: "Media service: admin routes",
-      environment: common
+      environment: common,
+      // Photo import downloads a batch of images from portal CDNs per call.
+      memorySize: 512,
+      timeout: Duration.seconds(29)
     }).fn;
     table.grantReadWriteData(adminFn);
     this.bucket.grantReadWrite(adminFn);
@@ -127,6 +130,12 @@ export class MediaStack extends Stack {
     });
     httpApi.addRoutes({
       path: "/api/v1/admin/listings/{listingId}/photos/presign",
+      methods: [HttpMethod.POST],
+      integration: adminInt,
+      authorizer: adminAuthorizer
+    });
+    httpApi.addRoutes({
+      path: "/api/v1/admin/listings/{listingId}/photos/import",
       methods: [HttpMethod.POST],
       integration: adminInt,
       authorizer: adminAuthorizer

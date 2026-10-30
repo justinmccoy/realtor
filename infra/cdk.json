@@ -16,6 +16,10 @@
           "adminEmail": "",
           "customerUrl": "https://d2sypuxkeexa2n.cloudfront.net",
           "adminUrl": "https://dveqa1ss76yri.cloudfront.net"
+        },
+        "listingImport": {
+          "proxyUrlTemplate": "",
+          "aiModel": ""
         }
       },
       "prod": {
@@ -30,6 +34,10 @@
           "adminEmail": "",
           "customerUrl": "https://d1czu5odsp4d48.cloudfront.net",
           "adminUrl": "https://d1nxohwg5k95p0.cloudfront.net"
+        },
+        "listingImport": {
+          "proxyUrlTemplate": "",
+          "aiModel": ""
         }
       }
     },

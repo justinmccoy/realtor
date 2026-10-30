@@ -78,6 +78,22 @@ export async function headObject(
   }
 }
 
+/** Server-side write (imports); browser uploads go through presignUpload. */
+export async function putObject(
+  key: string,
+  body: Uint8Array,
+  contentType: string
+): Promise<void> {
+  await s3().send(
+    new PutObjectCommand({
+      Bucket: bucket(),
+      Key: key,
+      Body: body,
+      ContentType: contentType
+    })
+  );
+}
+
 export async function deleteObject(key: string): Promise<void> {
   await s3().send(new DeleteObjectCommand({ Bucket: bucket(), Key: key }));
 }

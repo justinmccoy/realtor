@@ -110,7 +110,8 @@ export function addFunctionAlarms(
   scope: Construct,
   idPrefix: string,
   fn: lambda.Function,
-  topic: sns.ITopic
+  topic: sns.ITopic,
+  opts: { slowP95Ms?: number } = {}
 ): void {
   const action = new cwactions.SnsAction(topic);
 
@@ -137,10 +138,10 @@ export function addFunctionAlarms(
       period: Duration.minutes(5),
       statistic: "p95"
     }),
-    threshold: 3000,
+    threshold: opts.slowP95Ms ?? 3000,
     evaluationPeriods: 3,
     treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
-    alarmDescription: `${fn.functionName}: p95 latency above 3s`
+    alarmDescription: `${fn.functionName}: p95 latency above ${(opts.slowP95Ms ?? 3000) / 1000}s`
   });
   p95.addAlarmAction(action);
 }

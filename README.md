@@ -95,6 +95,39 @@ pnpm --filter @jj/admin-web dev       # http://localhost:5174
 (Dev API CORS already allows both localhost origins. Alternatively set
 `VITE_API_PROXY=<cloudfront url>` to proxy `/api` through Vite.)
 
+## Listing import (admin → Link inbox)
+
+**Import** next to an inbox link fetches the portal page, parses it (JSON-LD,
+meta tags, the German key/value table: Kaufpreis, Wohnfläche, Zimmer, Etage,
+Baujahr, Hausgeld, Provision, Balkon, Bezirk/Ortsteil from the address) and,
+when configured, asks the AI model to fill whatever the parser missed. A
+hidden draft listing is created, the photos found on the page are downloaded
+into the media bucket, and the editor opens on the draft with every
+auto-filled field marked for review. **Manual** keeps the old behaviour (an
+empty form with just the link). When a portal blocks the request the link is
+marked *Blocked* and **Paste text** imports from the page text copied out of
+your browser (also reachable via "Import from pasted text").
+
+Configuration, per environment:
+
+| What | Where | Default |
+|---|---|---|
+| AI extraction key | Secrets Manager secret `jj/<env>/listing-import/ai-api-key` (created by the Listing stack with a placeholder) | AI off until a real key is stored |
+| AI model | `infra/cdk.json` → `environments.<env>.listingImport.aiModel` | `DEFAULT_AI_MODEL` in `services/listings/src/import/ai.ts` |
+| Fetch proxy | `environments.<env>.listingImport.proxyUrlTemplate`, a scraping-API URL with `{url}` for the encoded target | none → direct fetch only |
+
+```bash
+aws secretsmanager put-secret-value \
+  --secret-id jj/dev/listing-import/ai-api-key --secret-string "sk-ant-…"
+```
+
+Notes: ImmobilienScout24 and Kleinanzeigen usually refuse requests from cloud
+IP ranges; a scraping proxy or the paste fallback covers them. Up to 15 photos
+are pulled per import (6 per request, 8 MB each, JPEG/PNG/WebP); more can be
+uploaded by hand. One import has ~29 s end to end (API Gateway's limit), so
+page fetch, proxy fallback and AI call each run against their own timeout and
+degrade to "page markup only" rather than failing the import.
+
 ## First-time deployment
 
 ```bash
