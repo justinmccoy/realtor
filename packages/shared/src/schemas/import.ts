@@ -139,5 +139,5 @@ export const importJobSchema = z.object({
 export type ImportJob = z.infer<typeof importJobSchema>;
 
 /** How long the admin app keeps polling before it gives up on a job. The
- *  worker Lambda has 120 s; the rest is queueing slack. */
-export const IMPORT_JOB_WAIT_MS = 150_000;
+ *  worker Lambda has 300 s; the rest is queueing slack. */
+export const IMPORT_JOB_WAIT_MS = 330_000;

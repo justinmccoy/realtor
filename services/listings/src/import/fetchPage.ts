@@ -85,7 +85,8 @@ export async function resolveFetchOptions(): Promise<FetchPageOptions> {
 
 /** Portals that always wall off cloud IPs: when a proxy is configured, don't
  *  burn seconds on the direct attempt first. */
-const KNOWN_BLOCKED = /(^|\.)(immobilienscout24\.de|immoscout24\.de|kleinanzeigen\.de|ebay-kleinanzeigen\.de)$/i;
+const KNOWN_BLOCKED =
+  /(^|\.)(immobilienscout24\.de|immoscout24\.de|kleinanzeigen\.de|ebay-kleinanzeigen\.de|immowelt\.de)$/i;
 
 /** Default budgets. The fetch runs in its own request (API Gateway allows
  *  30 s), so the proxy gets most of it: a JS-rendered page through
