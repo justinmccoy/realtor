@@ -29,12 +29,13 @@ function emailTemplates(site: "client" | "admin", url?: string) {
       emailSubject: `Your Genau Here ${site} account`,
       emailBody:
         `<p>An account has been created for you on the <b>${where}</b>.</p>` +
-        `<p>Sign in with this email address and the temporary password <b>{####}</b>. ` +
+        // Cognito rejects invite templates (email and SMS) without {username};
+        // admin invites use the email address as the username, so it reads naturally.
+        `<p>Sign in with the username <b>{username}</b> and the temporary password <b>{####}</b>. ` +
         `You will be asked to choose a new password the first time you sign in.</p>` +
         (site === "admin"
           ? `<p>Admin sign-in also requires an authenticator app; you will set it up on first login.</p>`
           : ""),
-      // Cognito rejects an invite SMS template without {username}.
       smsMessage: `${siteName}: your username is {username} and your temporary password is {####}`
     },
     userVerification: {
