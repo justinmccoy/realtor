@@ -31,8 +31,11 @@ function emailTemplates(site: "client" | "admin", url?: string) {
         `<p>An account has been created for you on the <b>${where}</b>.</p>` +
         // Cognito rejects invite templates (email and SMS) without {username};
         // admin invites use the email address as the username, so it reads naturally.
-        `<p>Sign in with the username <b>{username}</b> and the temporary password <b>{####}</b>. ` +
-        `You will be asked to choose a new password the first time you sign in.</p>` +
+        // The password and code sit at the end of their line with nothing after
+        // them: a trailing full stop gets read (or copied) as part of the value.
+        `<p>Sign in with the username <b>{username}</b></p>` +
+        `<p>Your temporary password is <b>{####}</b></p>` +
+        `<p>You will be asked to choose a new password the first time you sign in.</p>` +
         (site === "admin"
           ? `<p>Admin sign-in also requires an authenticator app; you will set it up on first login.</p>`
           : ""),
@@ -40,7 +43,9 @@ function emailTemplates(site: "client" | "admin", url?: string) {
     },
     userVerification: {
       emailSubject: `${siteName}: your verification code`,
-      emailBody: `<p>Your verification code for the <b>${where}</b> is <b>{####}</b>.</p>`,
+      emailBody:
+        `<p>Your verification code for the <b>${where}</b> is below.</p>` +
+        `<p>Code: <b>{####}</b></p>`,
       emailStyle: cognito.VerificationEmailStyle.CODE,
       smsMessage: `${siteName}: your verification code is {####}`
     }
