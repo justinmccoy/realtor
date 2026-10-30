@@ -71,14 +71,25 @@
 <p class="lead">
   Two single-page apps, one API, six small backend services that each own their
   own data, and an event bus that ties them together. Everything is serverless —
-  there is no machine to maintain, and at rest it costs almost nothing.
+  there is no machine to maintain, and at rest it costs almost nothing. In
+  production the client site is <b>genauhere.de</b> (and <b>www</b>), the
+  admin console <b>admin.genauhere.de</b>; dev lives on CloudFront URLs.
 </p>
+
+<div class="note">
+  <b>Reading order for newcomers:</b> the request path (1), then the service
+  catalog (2) and the event backbone (3) — that is 80% of the system. The
+  import pipeline (4) is the one piece with moving parts of its own. Come back
+  for data design and the worked example when you start changing code.
+</div>
 
 <nav class="toc">
   <a href="#request">Request path</a><a href="#services">Service catalog</a>
-  <a href="#events">Event backbone</a><a href="#tracking">Interaction tracking</a>
+  <a href="#events">Event backbone</a><a href="#import">Import pipeline</a>
+  <a href="#tracking">Interaction tracking</a>
   <a href="#auth">Auth model</a><a href="#data">Data design</a>
   <a href="#life">Life of a request</a><a href="#repo">Repo map</a>
+  <a href="#envs">Environments &amp; secrets</a>
 </nav>
 
 <!-- ===== Request path ===== -->
@@ -87,8 +98,12 @@
   <p>
     Browsers load the static apps from CloudFront and call the API on the
     <em>same domain</em> under <code>/api/*</code> — CloudFront forwards those to
-    API Gateway. Sign-in happens directly against Cognito; every API call then
-    carries a token that one of two authorizers checks before any service code runs.
+    API Gateway, so there is no CORS dance in production. Sign-in happens
+    directly against Cognito; every API call then carries a token that one of
+    two authorizers checks before any service code runs. The custom domains
+    are plain Route53 alias records pointing at the two distributions, with
+    certificates issued by ACM; the apps don't know or care which hostname
+    they are served from.
   </p>
   <figure>
   <svg viewBox="0 0 960 640" role="img" aria-label="Request path diagram">
@@ -118,12 +133,12 @@
 
     <!-- cloudfront -->
     <rect class="box" x="248" y="122" width="212" height="92" rx="8"/>
-    <text class="t" x="354" y="144" text-anchor="middle">CloudFront · www</text>
+    <text class="t" x="354" y="144" text-anchor="middle">CloudFront · genauhere.de</text>
     <text class="s" x="354" y="163" text-anchor="middle">static: S3 customer-web</text>
     <text class="s" x="354" y="179" text-anchor="middle">/api/* → API Gateway</text>
     <text class="s" x="354" y="197" text-anchor="middle">WAF (prod) · HTTPS</text>
     <rect class="box" x="500" y="122" width="212" height="92" rx="8"/>
-    <text class="t" x="606" y="144" text-anchor="middle">CloudFront · admin</text>
+    <text class="t" x="606" y="144" text-anchor="middle">CloudFront · admin.genauhere.de</text>
     <text class="s" x="606" y="163" text-anchor="middle">static: S3 admin-web</text>
     <text class="s" x="606" y="179" text-anchor="middle">/api/* → API Gateway</text>
     <text class="s" x="606" y="197" text-anchor="middle">WAF (prod) · HTTPS</text>
@@ -162,13 +177,13 @@
       <rect class="box" x="16" y="428" width="296" height="80" rx="8"/>
       <text class="t" x="164" y="450" text-anchor="middle">search</text>
       <text class="s" x="164" y="468" text-anchor="middle">client searches · brief · settings</text>
-      <text class="s" x="164" y="483" text-anchor="middle">members &amp; invites · last-seen</text>
+      <text class="s" x="164" y="483" text-anchor="middle">members &amp; invites · notifications</text>
       <text class="s" x="164" y="499" text-anchor="middle">⛁ search-table</text>
 
       <rect class="box" x="332" y="428" width="296" height="80" rx="8"/>
       <text class="t" x="480" y="450" text-anchor="middle">listings</text>
-      <text class="s" x="480" y="468" text-anchor="middle">pipeline · publish · benchmark · top-5</text>
-      <text class="s" x="480" y="483" text-anchor="middle">remodel · link inbox</text>
+      <text class="s" x="480" y="468" text-anchor="middle">global pool · per-search visibility</text>
+      <text class="s" x="480" y="483" text-anchor="middle">link inbox · import jobs · benchmark</text>
       <text class="s" x="480" y="499" text-anchor="middle">⛁ listing-table</text>
 
       <rect class="box" x="648" y="428" width="296" height="80" rx="8"/>
@@ -212,8 +227,8 @@
   <p>Each service is independently deployable, owns its table exclusively, and never reads another service's data directly.</p>
   <table>
     <tr><th>Service</th><th>Client can…</th><th>Admin can…</th><th>Publishes events</th><th>Listens to</th></tr>
-    <tr><td>search</td><td>list "my searches", read search + brief (records last-seen)</td><td>CRUD searches, edit brief/settings, invite/remove members</td><td><code>search.*</code>, <code>member.*</code>, <code>client.signed_in</code></td><td>—</td></tr>
-    <tr><td>listings</td><td>read <b>published</b> listings (admin-private fields stripped)</td><td>full CRUD, publish/unpublish, status/contact/rank/remodel, bulk ops, inbox, viewings overview</td><td><code>listing.*</code> (with title/published payload)</td><td>—</td></tr>
+    <tr><td>search</td><td>list "my searches", read search + brief (records last-seen), invite others</td><td>CRUD searches, edit brief/settings, invite/remove members</td><td><code>search.*</code>, <code>member.*</code>, <code>client.signed_in</code></td><td><code>listing.shared</code>, <code>comment.created</code>, <code>rating.saved</code>, <code>member.invited</code> → email notifications (SES, when configured)</td></tr>
+    <tr><td>listings</td><td>read the <b>published</b> listings its search may see (admin-private fields stripped)</td><td>full CRUD, publish/unpublish, share/hide per search, status/contact/rank/remodel, bulk ops, inbox, <b>link import</b> (fetch + AI, as a background job), viewings overview</td><td><code>listing.*</code> (with title/published payload), <code>listing.import.requested</code></td><td><code>search.created/updated</code> → keeps a copy of each search's brief + settings; <code>listing.import.requested</code> → the import worker</td></tr>
     <tr><td>media</td><td>gallery of published listings (signed URLs)</td><td>presign-upload-confirm flow, reorder, delete</td><td><code>photo.*</code></td><td><code>listing.published/unpublished/deleted</code></td></tr>
     <tr><td>engagement</td><td>rate 1–5★ (clients), comment &amp; reply (all)</td><td>moderate ratings/comments, reply as JJ</td><td><code>rating.*</code>, <code>comment.*</code></td><td><code>listing.*</code> (identity/visibility guard)</td></tr>
     <tr><td>timesheet</td><td>read the hours ledger</td><td>log hours, timer, mark paid / pay-month</td><td><code>hours.*</code></td><td>—</td></tr>
@@ -227,11 +242,14 @@
   <p>
     Writes publish a small event to one EventBridge bus. That's how services
     cooperate without touching each other's tables: the activity service records
-    history, and media/engagement keep tiny event-carried copies of listing
-    state ("is it published? what's its title?") so they can make decisions locally.
+    history, media/engagement keep tiny event-carried copies of listing
+    state ("is it published? what's its title?") so they can make decisions
+    locally, listings keeps a copy of each search's brief and settings so it can
+    compute what a search may see, and the bus is also how a link import is
+    handed to its worker.
   </p>
   <figure>
-  <svg viewBox="0 0 960 360" role="img" aria-label="Event flow diagram">
+  <svg viewBox="0 0 960 470" role="img" aria-label="Event flow diagram">
     <defs>
       <marker id="arrB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
         <path d="M0,0 L10,5 L0,10 z" fill="var(--accent)"/>
@@ -278,11 +296,19 @@
     <text class="s" x="815" y="298" text-anchor="middle">keeps {searchId, title, published} per listing</text>
     <text class="s" x="815" y="314" text-anchor="middle">→ blocks cross-tenant &amp; unpublished writes</text>
 
+    <rect class="box plain" x="690" y="354" width="250" height="92" rx="8"/>
+    <text class="t" x="815" y="376" text-anchor="middle">listings · consumer + worker</text>
+    <text class="s" x="815" y="394" text-anchor="middle">search.created/updated → copies brief + settings</text>
+    <text class="s" x="815" y="410" text-anchor="middle">listing.import.requested → runs the import job</text>
+    <text class="s" x="815" y="426" text-anchor="middle">(fetch · parse · AI · draft, 2-minute budget)</text>
+
     <path class="edge ev" d="M570,160 C630,140 640,100 690,90" marker-end="url(#arrB)"/>
     <path class="edge ev" d="M570,182 C630,185 640,195 690,197" marker-end="url(#arrB)"/>
     <path class="edge ev" d="M570,200 C630,220 640,280 690,290" marker-end="url(#arrB)"/>
+    <path class="edge ev" d="M570,212 C630,260 640,380 690,398" marker-end="url(#arrB)"/>
     <text class="s" x="612" y="110">all events</text>
     <text class="s" x="600" y="233">listing.* only</text>
+    <text class="s" x="596" y="372">search.* + import</text>
   </svg>
   <figcaption>
     If a consumer is down or failing, EventBridge retries and then parks the
@@ -292,12 +318,57 @@
   </figure>
 </section>
 
+<!-- ===== Import pipeline ===== -->
+<section class="card" id="import">
+  <h2>4 · The listing import pipeline</h2>
+  <p>
+    JJ pastes a portal link (ImmobilienScout24, Kleinanzeigen, …) into the
+    admin app's <b>Link inbox</b> and clicks <b>Import</b>. Fetching a page
+    through a rendering proxy and asking the AI model can take over a minute,
+    longer than API Gateway allows a request to last, so the work runs as a
+    background job and the browser watches it.
+  </p>
+  <ol>
+    <li><b>Queue.</b> <code>POST /api/v1/admin/import</code> stores a job row
+      (<code>queued</code>) and publishes <code>listing.import.requested</code>;
+      it answers <code>202</code> immediately.</li>
+    <li><b>Fetch.</b> The <b>import worker</b> Lambda (two-minute budget) picks the
+      event up. It fetches the page directly, or straight through the ScrapingBee
+      proxy for portals known to block cloud IPs; the proxy renders JavaScript
+      through German residential addresses.</li>
+    <li><b>Parse.</b> JSON-LD, meta tags and the German key/value table (Kaufpreis,
+      Wohnfläche, Zimmer, Etage, Baujahr, Hausgeld, Provision…) are read with
+      plain code — no AI needed for the numbers.</li>
+    <li><b>Extract.</b> The page text goes to Claude with a fixed output schema.
+      It fills what the parser missed (district from a postcode, floor from
+      prose) and writes every text field in <b>English</b>, translating the German
+      page. If the key isn't configured or the call fails, the import still
+      succeeds with "page markup only".</li>
+    <li><b>Save.</b> A hidden draft listing is created, the inbox link is marked
+      done, and the job row gets the result. Progress (<code>fetching</code> →
+      <code>extracting</code> → <code>saving</code>) is written to the job as it goes.</li>
+    <li><b>Watch.</b> The admin app polls <code>GET /api/v1/admin/import/{jobId}</code>
+      every 1.5 s and shows a house being built, one stage per step. When the job
+      is done it imports the photos found on the page in batches of six (the
+      media service downloads them into S3) and opens the editor with every
+      auto-filled field marked for review.</li>
+  </ol>
+  <div class="note">
+    Pasted text (the fallback when a portal blocks even the proxy) skips the
+    queue: it only needs the AI call, so the API reads it inline. A job that
+    overruns is marked <code>failed</code> with a <code>timeout</code> error rather
+    than dying silently, and can simply be retried. Job rows expire after a day.
+    The AI and proxy keys live in Secrets Manager and are read at runtime —
+    storing a key takes effect within a minute, no redeploy.
+  </div>
+</section>
+
 <!-- ===== Tracking ===== -->
 <section class="card" id="tracking">
-  <h2>4 · Client interaction tracking</h2>
+  <h2>5 · Client interaction tracking</h2>
   <p>
-    The thing you asked for specifically: knowing what the client actually does
-    on the site. Two signal paths feed the same place.
+    Knowing what the client actually does on the site. Two signal paths feed
+    the same place.
   </p>
   <figure>
   <svg viewBox="0 0 960 230" role="img" aria-label="Tracking data flow">
@@ -347,7 +418,7 @@
 
 <!-- ===== Auth ===== -->
 <section class="card" id="auth">
-  <h2>5 · Who can do what</h2>
+  <h2>6 · Who can do what</h2>
   <div class="cols">
     <div class="mini">
       <h3>Client</h3>
@@ -376,23 +447,41 @@
     against that map, (3) engagement/media verify listing↔search identity from
     event-carried state before accepting writes.
   </div>
+  <h3>Invitations, in practice</h3>
+  <p>
+    Inviting an email address from either app does one of three things, and
+    the app says which: a <b>new</b> account is created and Cognito emails a
+    temporary password; an address that was invited before but <b>never signed
+    in</b> gets the invitation again with a fresh temporary password (they
+    expire after 7 days); an address with a working account is simply given
+    access, with no email. Two consequences worth knowing: "forgot password"
+    cannot reset an account that is still on its temporary password — Cognito
+    quietly reports success and sends nothing, because the customer app hides
+    whether an account exists — so re-invite instead; and invitation/reset
+    emails come from Cognito's built-in mailer (50 a day, spam-prone) until an
+    SES sender is configured.
+  </p>
 </section>
 
 <!-- ===== Data ===== -->
 <section class="card" id="data">
-  <h2>6 · Data design in one paragraph</h2>
+  <h2>7 · Data design in one paragraph</h2>
   <p>
     Every table uses the same generic key pair (<code>PK</code>/<code>SK</code>)
     with entity-prefixed values, so one table per service holds several record
     types. A <b>search</b> is the tenancy unit: almost everything lives in a
     <code>SEARCH#&lt;id&gt;</code> partition, which makes "load the whole board"
-    one query. IDs are ULIDs — lexicographically time-ordered, so "newest first"
-    is free.
+    one query. The exception is <b>listings</b>, which form one global pool: a
+    search sees a published listing when it matches the search's brief and
+    settings (a copy of which the listing service keeps, fed by events), or when
+    JJ shared it by hand, and never when she hid it — computed on read, never
+    copied per search. IDs are ULIDs — lexicographically time-ordered, so
+    "newest first" is free.
   </p>
   <table>
     <tr><th>Table</th><th>Partition examples</th><th>Special indexes / tricks</th></tr>
     <tr><td>search</td><td><code>SEARCH#id → META, BRIEF, MEMBER#user</code></td><td>GSI by user → "my searches" (powers the authorizer); conditional update throttles last-seen to 1/15 min</td></tr>
-    <tr><td>listing</td><td><code>SEARCH#id → LISTING#id, SOURCE#id</code></td><td>sparse GSI containing only listings with a future viewing → cross-search viewings list</td></tr>
+    <tr><td>listing</td><td><code>POOL → LISTING#id, SOURCE#id</code> · <code>SEARCH#id → CRITERIA, SHARE#listing</code> · <code>IMPORTJOB#id → JOB</code></td><td>sparse GSI containing only listings with a future viewing → cross-search viewings list; CRITERIA is the event-carried brief + settings; import jobs carry a one-day TTL</td></tr>
     <tr><td>media</td><td><code>LISTING#id → PHOTO#id, META</code></td><td>GSI by search for the gallery; META carries the event-fed published flag</td></tr>
     <tr><td>engagement</td><td><code>LISTING#id → RATING#user</code> · <code>SEARCH#id → COMMENT#id</code></td><td>GSI: all ratings per search; soft-deleted comments keep thread shape</td></tr>
     <tr><td>timesheet</td><td><code>SEARCH#id → HOURS#id, TIMER</code></td><td>timer uses a conditional put — only one can run</td></tr>
@@ -402,10 +491,10 @@
 
 <!-- ===== Life of a request ===== -->
 <section class="card" id="life">
-  <h2>7 · Life of a request: Brian rates a listing ★★★★★</h2>
+  <h2>8 · Life of a request: Brian rates a listing ★★★★★</h2>
   <ol>
     <li>Brian clicks 5 stars → <code>PUT /api/v1/searches/S1/listings/L7/rating</code> with his customer-pool token.</li>
-    <li>CloudFront (www) forwards <code>/api/*</code> to API Gateway, same origin.</li>
+    <li>CloudFront (genauhere.de) forwards <code>/api/*</code> to API Gateway, same origin.</li>
     <li>The <b>Lambda authorizer</b> verifies the token signature against the customer pool and queries the search table's membership index: Brian → <code>{S1: client}</code>. Cached 5 min.</li>
     <li>The <b>engagement</b> handler validates the body with zod, checks Brian's role in S1 (clients may rate and comment; viewers are read-only), and checks its local listing meta: L7 belongs to S1 <em>and</em> is published.</li>
     <li>The rating is upserted (one per user per listing) and <code>rating.saved</code> — "Brian rated ‘Top-floor flat with roof terrace’ 5★" — goes onto the bus.</li>
@@ -416,23 +505,57 @@
 
 <!-- ===== Repo map ===== -->
 <section class="card" id="repo">
-  <h2>8 · Where things live in the repo</h2>
+  <h2>9 · Where things live in the repo</h2>
   <table>
     <tr><th>Path</th><th>What it is</th></tr>
-    <tr><td><code>packages/shared</code></td><td>The contract everyone agrees on: zod schemas, Berlin district data, the all-in cost math (price × (1 + tax + notary + commission)), event types. Used by every service <em>and</em> both frontends.</td></tr>
-    <tr><td><code>packages/lambda-kit</code></td><td>Per-Lambda plumbing: request validation, auth context extraction, consistent error bodies, event publishing, logging.</td></tr>
+    <tr><td><code>packages/shared</code></td><td>The contract everyone agrees on: zod schemas, Berlin district data, the all-in cost math (price × (1 + tax + notary + commission)), the brief-matching rule, event types. Used by every service <em>and</em> both frontends.</td></tr>
+    <tr><td><code>packages/lambda-kit</code></td><td>Per-Lambda plumbing: request validation, auth context extraction, consistent error bodies, event publishing, logging, a safe outbound fetch.</td></tr>
     <tr><td><code>services/*</code></td><td>One folder per service: <code>handlers/</code> (admin/customer/events entrypoints), <code>repo.ts</code> (DynamoDB), <code>domain.ts</code> (pure logic), <code>tests/</code> (unit + DynamoDB-backed integration).</td></tr>
+    <tr><td><code>services/listings/src/import</code></td><td>The link importer: <code>fetchPage.ts</code> (direct/proxy, bot-wall detection), <code>parse.ts</code> + <code>html.ts</code> (markup extraction), <code>ai.ts</code> (the Claude call and its schema), <code>job.ts</code> (the job state machine), <code>secrets.ts</code>.</td></tr>
     <tr><td><code>apps/customer-web</code></td><td>The client site — the original prototype's CSS extracted verbatim, React components mirroring its behavior, Cognito auth, tracking beacon.</td></tr>
     <tr><td><code>apps/admin-web</code></td><td>Admin console: dashboard, search/listing/hours management, engagement analytics, audit log.</td></tr>
-    <tr><td><code>infra</code></td><td>AWS CDK: 12 stacks (platform, auth, API, edge, frontends, one per service). <code>cdk.json</code> holds the dev/prod knobs (region, WAF, domains).</td></tr>
+    <tr><td><code>infra</code></td><td>AWS CDK: 12 stacks (platform, auth, API, edge, frontends, one per service), 20 Lambdas in all. <code>cdk.json</code> holds the dev/prod knobs (region, WAF, domains, email URLs, import proxy/model).</td></tr>
     <tr><td><code>.github/workflows</code></td><td>CI (verify everything on each push/PR) and Deploy (dev → manual approval → prod).</td></tr>
     <tr><td><code>docs/</code></td><td>This page and the AWS setup runbook.</td></tr>
   </table>
   <div class="note">
     Rule of thumb when changing things: data shape → <code>packages/shared</code> first,
     then the owning service, then the UIs. New endpoint → service handler + its CDK
-    stack route + <code>api/client.ts</code> in the app that calls it.
+    stack route + <code>api/client.ts</code> in the app that calls it. Changing an
+    email template or a domain → <code>infra/lib/auth-stack.ts</code> or
+    <code>infra/cdk.json</code>, then a deploy.
   </div>
+</section>
+
+<!-- ===== Environments ===== -->
+<section class="card" id="envs">
+  <h2>10 · Environments, domains and secrets</h2>
+  <p>
+    There are two complete copies of everything: <b>dev</b> (stacks
+    <code>JJ-dev-*</code>, CloudFront URLs, WAF off, data deleted on teardown)
+    and <b>prod</b> (<code>JJ-prod-*</code>, the custom domains, WAF on, data
+    retained). Both come from the same code; the only differences are the
+    knobs in <code>infra/cdk.json</code> under <code>environments.dev</code> and
+    <code>environments.prod</code>.
+  </p>
+  <table>
+    <tr><th>Knob</th><th>What it controls</th></tr>
+    <tr><td><code>domain</code></td><td>Hostnames for the two sites (<code>customer</code>, <code>customerAliases</code> such as www, <code>admin</code>) in a Route53 zone (<code>zoneName</code>). Set only in prod. Needs the zone to exist and the registrar to delegate to it before deploying; the deploy then issues certificates, attaches the names to CloudFront and writes the DNS records.</td></tr>
+    <tr><td><code>notify</code></td><td>URLs used in emails (Cognito invitations/resets, activity notifications) and the SES sender + JJ's inbox for notifications. Without <code>mailFrom</code>, no activity emails are sent; Cognito's own mailer still handles invitations.</td></tr>
+    <tr><td><code>listingImport</code></td><td>The scraping-proxy URL template (with <code>{url}</code> and <code>{key}</code>) and, optionally, the AI model id.</td></tr>
+    <tr><td><code>enableWaf</code>, <code>removalPolicy</code>, <code>logRetentionDays</code></td><td>The usual dev/prod differences: protection, data retention, log retention.</td></tr>
+  </table>
+  <p>
+    Anything secret — the Anthropic key for AI extraction, the ScrapingBee key
+    for the proxy — is <em>not</em> in <code>cdk.json</code>. The Listing stack
+    creates a Secrets Manager secret per key with a placeholder value
+    (<code>jj/&lt;env&gt;/listing-import/ai-api-key</code>,
+    <code>…/proxy-api-key</code>); you store the real value with
+    <code>aws secretsmanager put-secret-value</code>, and the Lambdas read it at
+    runtime, re-checking a missing key every minute. The deploy pipeline is
+    GitHub Actions: every merge to <code>main</code> deploys dev automatically
+    and then waits for a human to approve the production step.
+  </p>
 </section>
 
 </div>
