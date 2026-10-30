@@ -85,7 +85,7 @@ export class ListingStack extends Stack {
     // draft. A link import takes longer than API Gateway's 30 s window once a
     // proxy and the AI are involved, so it runs as a job: the API Lambda
     // queues it (and reads pasted text inline), a worker Lambda with a
-    // two-minute budget picks it up from the bus, and the admin app polls.
+    // five-minute budget picks it up from the bus, and the admin app polls.
     // The AI key lives in Secrets Manager; the stack creates the secret with
     // a random placeholder and the importer treats anything that is not a
     // real key as "AI off". Store the key with
@@ -144,14 +144,16 @@ export class ListingStack extends Stack {
       description: "Listing service: run a queued link import (page fetch + AI)",
       environment: importEnv,
       memorySize: 1024,
-      timeout: Duration.seconds(120)
+      // Direct 10 s + proxy 145 s + AI 90 s, plus DynamoDB/S3 work and a grace
+      // period for recording a timeout on the job. Lambda allows up to 15 min.
+      timeout: Duration.seconds(300)
     }).fn;
     table.grantReadWriteData(importWorkerFn);
     bus.grantPutEventsTo(importWorkerFn);
     aiSecret.grantRead(importWorkerFn);
     proxySecret.grantRead(importWorkerFn);
     addFunctionAlarms(this, "ImportWorker", importWorkerFn, props.alarmTopic, {
-      slowP95Ms: 100_000
+      slowP95Ms: 250_000
     });
     new events.Rule(this, "ImportRequested", {
       eventBus: bus,

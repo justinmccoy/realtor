@@ -50,7 +50,7 @@ describe("progressCopy", () => {
 
   it("changes its tone once the import is slow", () => {
     expect(progressCopy({ kind: "fetching" }, 1_000).hint).toMatch(/Usually 10–30 seconds/);
-    expect(progressCopy({ kind: "fetching" }, SLOW_AFTER_MS).hint).toMatch(/two minutes/);
+    expect(progressCopy({ kind: "fetching" }, SLOW_AFTER_MS).hint).toMatch(/five minutes/);
     expect(progressCopy({ kind: "reading" }, SLOW_AFTER_MS).hint).toMatch(/pasted text/);
   });
 });

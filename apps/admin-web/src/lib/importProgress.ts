@@ -25,7 +25,7 @@ export function progressCopy(
 ): { label: string; hint: string } {
   const slow = elapsedMs >= SLOW_AFTER_MS;
   const patience = slow
-    ? "Still building — some portals and the AI take their time. This can run up to about two minutes."
+    ? "Still building — some portals take a couple of minutes to render through the proxy. This can run up to about five minutes."
     : "Usually 10–30 seconds.";
   switch (p.kind) {
     case "queued":

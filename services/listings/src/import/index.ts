@@ -49,13 +49,15 @@ export interface ImportDeps {
 
 /**
  * Time budgets per import kind. A link import runs in the worker Lambda
- * (120 s, see infra/lib/listing-stack.ts): the worst case — direct fetch
- * refused, proxy slow, AI slow — must still finish inside it. Pasted text is
- * read inline by the API Lambda (29 s, API Gateway's limit) and only needs
- * the AI call.
+ * (300 s, see infra/lib/listing-stack.ts): the worst case — direct fetch
+ * refused, proxy slow, AI slow — must still finish inside it. The proxy
+ * budget sits just above ScrapingBee's own 140 s render limit, so a page it
+ * cannot render fails with the proxy's error rather than ours. Pasted text
+ * is read inline by the API Lambda (29 s, API Gateway's limit) and only
+ * needs the AI call.
  */
 export const IMPORT_BUDGETS = {
-  link: { directTimeoutMs: 10_000, proxyTimeoutMs: 30_000, aiTimeoutMs: 60_000 },
+  link: { directTimeoutMs: 10_000, proxyTimeoutMs: 145_000, aiTimeoutMs: 90_000 },
   paste: { aiTimeoutMs: 24_000 }
 } as const;
 
