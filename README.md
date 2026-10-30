@@ -100,8 +100,10 @@ pnpm --filter @jj/admin-web dev       # http://localhost:5174
 **Import** next to an inbox link fetches the portal page, parses it (JSON-LD,
 meta tags, the German key/value table: Kaufpreis, Wohnfläche, Zimmer, Etage,
 Baujahr, Hausgeld, Provision, Balkon, Bezirk/Ortsteil from the address) and,
-when configured, asks the AI model to fill whatever the parser missed. A
-hidden draft listing is created, the photos found on the page are downloaded
+when configured, asks the AI model to fill whatever the parser missed and to
+write every text field (title, floor, year, balcony and notes) in English,
+translating the German page. Without the AI key those fields stay as the
+portal wrote them. A hidden draft listing is created, the photos found on the page are downloaded
 into the media bucket, and the editor opens on the draft with every
 auto-filled field marked for review. **Manual** keeps the old behaviour (an
 empty form with just the link). When a portal blocks the request the link is
