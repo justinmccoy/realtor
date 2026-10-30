@@ -14,8 +14,8 @@
         "notify": {
           "mailFrom": "",
           "adminEmail": "",
-          "customerUrl": "",
-          "adminUrl": ""
+          "customerUrl": "https://d2sypuxkeexa2n.cloudfront.net",
+          "adminUrl": "https://dveqa1ss76yri.cloudfront.net"
         }
       },
       "prod": {
@@ -24,7 +24,13 @@
         "removalPolicy": "retain",
         "enableWaf": true,
         "alarmEmail": "",
-        "domain": null
+        "domain": null,
+        "notify": {
+          "mailFrom": "",
+          "adminEmail": "",
+          "customerUrl": "https://d1czu5odsp4d48.cloudfront.net",
+          "adminUrl": "https://d1nxohwg5k95p0.cloudfront.net"
+        }
       }
     },
     "@aws-cdk/aws-apigateway:usagePlanKeyOrderInsensitiveId": true,

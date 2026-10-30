@@ -15,6 +15,36 @@ export interface AuthStackProps extends StackProps {
  *    JWT authorizer bound to this pool's issuer, so a customer token can
  *    never pass an admin route.
  */
+/**
+ * Cognito's stock emails never say which site they belong to, and the same
+ * person can hold an account in both pools. Name the site in every invite /
+ * verification message, and link it when the URL is known at synth time
+ * (custom domain, or notify.customerUrl / adminUrl in cdk.json).
+ */
+function emailTemplates(site: "client" | "admin", url?: string) {
+  const siteName = `Genau Here ${site} site`;
+  const where = url ? `${siteName} (${url})` : siteName;
+  return {
+    userInvitation: {
+      emailSubject: `Your Genau Here ${site} account`,
+      emailBody:
+        `<p>An account has been created for you on the <b>${where}</b>.</p>` +
+        `<p>Sign in with this email address and the temporary password <b>{####}</b>. ` +
+        `You will be asked to choose a new password the first time you sign in.</p>` +
+        (site === "admin"
+          ? `<p>Admin sign-in also requires an authenticator app; you will set it up on first login.</p>`
+          : ""),
+      smsMessage: `${siteName}: your temporary password is {####}`
+    },
+    userVerification: {
+      emailSubject: `${siteName}: your verification code`,
+      emailBody: `<p>Your verification code for the <b>${where}</b> is <b>{####}</b>.</p>`,
+      emailStyle: cognito.VerificationEmailStyle.CODE,
+      smsMessage: `${siteName}: your verification code is {####}`
+    }
+  };
+}
+
 export class AuthStack extends Stack {
   readonly customerPool: cognito.UserPool;
   readonly customerClient: cognito.UserPoolClient;
@@ -25,12 +55,19 @@ export class AuthStack extends Stack {
     super(scope, id, props);
     const { config } = props;
     const prod = config.envName === "prod";
+    const customerUrl = config.domain
+      ? `https://${config.domain.customer}`
+      : config.notify.customerUrl || undefined;
+    const adminUrl = config.domain
+      ? `https://${config.domain.admin}`
+      : config.notify.adminUrl || undefined;
 
     this.customerPool = new cognito.UserPool(this, "CustomerPool", {
       userPoolName: `jj-customers-${config.envName}`,
       selfSignUpEnabled: true,
       signInAliases: { email: true },
       autoVerify: { email: true },
+      ...emailTemplates("client", customerUrl),
       standardAttributes: {
         fullname: { required: true, mutable: true }
       },
@@ -59,6 +96,7 @@ export class AuthStack extends Stack {
       userPoolName: `jj-admins-${config.envName}`,
       selfSignUpEnabled: false,
       signInAliases: { email: true },
+      ...emailTemplates("admin", adminUrl),
       standardAttributes: {
         fullname: { required: true, mutable: true }
       },
