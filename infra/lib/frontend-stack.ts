@@ -43,9 +43,10 @@ export class FrontendStack extends Stack {
 
     const makeSite = (
       name: "customer" | "admin",
-      domainName?: string,
+      domainNames: string[],
       certificate?: acm.ICertificate
     ): SpaSite => {
+      const domainName = domainNames[0];
       const bucket = new s3.Bucket(this, `${name}Bucket`, {
         bucketName: `jj-${name}-web-${config.envName}-${this.account}`,
         blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
@@ -99,9 +100,7 @@ function handler(event) {
         },
         priceClass: cloudfront.PriceClass.PRICE_CLASS_100,
         webAclId: props.webAclArn,
-        ...(domainName && certificate
-          ? { domainNames: [domainName], certificate }
-          : {})
+        ...(domainName && certificate ? { domainNames, certificate } : {})
       });
 
       new CfnOutput(this, `${name}BucketName`, { value: bucket.bucketName });
@@ -116,23 +115,30 @@ function handler(event) {
       return { bucket, distribution };
     };
 
-    this.customer = makeSite(
-      "customer",
-      config.domain?.customer,
-      props.customerCert
+    const customerNames = config.domain
+      ? [config.domain.customer, ...(config.domain.customerAliases ?? [])]
+      : [];
+    this.customer = makeSite("customer", customerNames, props.customerCert);
+    this.admin = makeSite(
+      "admin",
+      config.domain ? [config.domain.admin] : [],
+      props.adminCert
     );
-    this.admin = makeSite("admin", config.domain?.admin, props.adminCert);
 
     if (config.domain) {
       const zone = route53.HostedZone.fromLookup(this, "Zone", {
         domainName: config.domain.zoneName
       });
-      new route53.ARecord(this, "CustomerAlias", {
-        zone,
-        recordName: config.domain.customer,
-        target: route53.RecordTarget.fromAlias(
-          new r53targets.CloudFrontTarget(this.customer.distribution)
-        )
+      // One alias record per customer hostname (apex + e.g. www), all on
+      // the same distribution; CloudFront serves the app under either name.
+      customerNames.forEach((recordName, i) => {
+        new route53.ARecord(this, i === 0 ? "CustomerAlias" : `CustomerAlias${i}`, {
+          zone,
+          recordName,
+          target: route53.RecordTarget.fromAlias(
+            new r53targets.CloudFrontTarget(this.customer.distribution)
+          )
+        });
       });
       new route53.ARecord(this, "AdminAlias", {
         zone,

@@ -159,8 +159,11 @@ pnpm deploy:dev        # ≈10–15 min first time (CloudFront)
 
 The stack outputs print the CloudFront URLs, pool ids and table names.
 Custom domains: fill in `context.environments.prod.domain` in `infra/cdk.json`
-(`zoneName`, `customer`, `admin`) — Route53 records and ACM certs are created
-automatically.
+(`zoneName`, `customer`, `admin`, optionally `customerAliases` such as
+`["www.example.com"]`, which serve the customer app too) — Route53 records and
+ACM certs are created automatically. The zone must already exist in Route53
+(and the registrar must delegate to it) before the deploy, since certificate
+validation waits on DNS.
 
 ### Create the first admin
 

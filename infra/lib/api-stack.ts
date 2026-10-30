@@ -50,7 +50,11 @@ export class ApiStack extends Stack {
     const corsOrigins = [
       ...config.devOrigins,
       ...(config.domain
-        ? [`https://${config.domain.customer}`, `https://${config.domain.admin}`]
+        ? [
+            config.domain.customer,
+            ...(config.domain.customerAliases ?? []),
+            config.domain.admin
+          ].map((host) => `https://${host}`)
         : [])
     ];
 

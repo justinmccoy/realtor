@@ -78,6 +78,7 @@ export class EdgeStack extends Stack {
       });
       this.customerCert = new acm.Certificate(this, "CustomerCert", {
         domainName: config.domain.customer,
+        subjectAlternativeNames: config.domain.customerAliases,
         validation: acm.CertificateValidation.fromDns(zone)
       });
       this.adminCert = new acm.Certificate(this, "AdminCert", {
