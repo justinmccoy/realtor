@@ -173,7 +173,7 @@ limit:
 
 1. `POST /api/v1/admin/import` stores a job and publishes
    `listing.import.requested`; it answers `202` with the job at once.
-2. The **import worker** Lambda (two-minute budget) picks the job up from
+2. The **import worker** Lambda (five-minute budget) picks the job up from
    the bus, fetches the page (directly, or straight through the proxy for
    portals known to block cloud IPs), parses it, calls the AI, creates the
    draft, and records progress (`fetching` → `extracting` → `saving`) and the
@@ -184,7 +184,8 @@ limit:
 
 Page fetch, proxy fallback and AI call each have their own timeout
 (`IMPORT_BUDGETS` in `services/listings/src/import/index.ts`: 10 s direct,
-30 s proxy, 60 s AI). A slow or failed AI call degrades to "page markup
+145 s proxy — just above ScrapingBee's own 140 s render limit — and 90 s
+AI). A slow or failed AI call degrades to "page markup
 only" rather than failing the import; a job that overruns is marked failed
 with a `timeout` error and can simply be retried. Pasted text is read inline
 (≈25 s budget), since it only needs the AI call. Jobs expire from the table

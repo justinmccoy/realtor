@@ -300,7 +300,7 @@
     <text class="t" x="815" y="376" text-anchor="middle">listings · consumer + worker</text>
     <text class="s" x="815" y="394" text-anchor="middle">search.created/updated → copies brief + settings</text>
     <text class="s" x="815" y="410" text-anchor="middle">listing.import.requested → runs the import job</text>
-    <text class="s" x="815" y="426" text-anchor="middle">(fetch · parse · AI · draft, 2-minute budget)</text>
+    <text class="s" x="815" y="426" text-anchor="middle">(fetch · parse · AI · draft, 5-minute budget)</text>
 
     <path class="edge ev" d="M570,160 C630,140 640,100 690,90" marker-end="url(#arrB)"/>
     <path class="edge ev" d="M570,182 C630,185 640,195 690,197" marker-end="url(#arrB)"/>
@@ -332,7 +332,7 @@
     <li><b>Queue.</b> <code>POST /api/v1/admin/import</code> stores a job row
       (<code>queued</code>) and publishes <code>listing.import.requested</code>;
       it answers <code>202</code> immediately.</li>
-    <li><b>Fetch.</b> The <b>import worker</b> Lambda (two-minute budget) picks the
+    <li><b>Fetch.</b> The <b>import worker</b> Lambda (five-minute budget) picks the
       event up. It fetches the page directly, or straight through the ScrapingBee
       proxy for portals known to block cloud IPs; the proxy renders JavaScript
       through German residential addresses.</li>
