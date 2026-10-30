@@ -166,8 +166,7 @@ export function RatingBlock({
       ) : (
         <div className="myrate">
           <p className="note-line" style={{ margin: 0 }}>
-            Star ratings can't be saved with your access — leave your rating as a
-            comment instead, e.g. "4 stars, loved the balcony".
+            You have view-only access, so you can see ratings but not add your own.
           </p>
         </div>
       )}

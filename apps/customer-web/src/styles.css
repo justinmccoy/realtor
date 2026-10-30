@@ -292,6 +292,51 @@ img {
 .tile .photo .nav {
   z-index: 2;
 }
+/* star rating overlay, top-right of the tile photo */
+.tile-stars {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  padding: 3px 7px;
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--ink) 75%, transparent);
+  line-height: 1;
+}
+.tile-stars .ts {
+  font: inherit;
+  font-size: 16px;
+  line-height: 1;
+  color: color-mix(in srgb, var(--bg) 45%, transparent);
+  background: none;
+  border: 0;
+  padding: 2px 1px;
+  margin: 0;
+  transition: color 0.1s, transform 0.1s;
+}
+.tile-stars .ts.on {
+  color: var(--sign);
+}
+.tile-stars button.ts {
+  cursor: pointer;
+}
+.tile-stars button.ts:hover {
+  transform: scale(1.2);
+}
+.tile-stars button.ts:focus-visible {
+  outline: 2px solid var(--bg);
+  outline-offset: 1px;
+  border-radius: 4px;
+}
+.tile-stars.saving .ts {
+  opacity: 0.6;
+}
+.tile-stars.failed {
+  box-shadow: 0 0 0 2px var(--warn);
+}
 .tile-link {
   display: flex;
   align-items: baseline;
@@ -458,5 +503,78 @@ img {
   .roles,
   .invite .two {
     grid-template-columns: 1fr;
+  }
+}
+
+/* ---- phones ---- */
+/* Keep the page clear of notches and rounded corners. */
+.wrap {
+  padding-inline: max(20px, env(safe-area-inset-left, 0px))
+    max(20px, env(safe-area-inset-right, 0px));
+}
+/* Thumb-sized controls on touch screens. */
+@media (pointer: coarse) {
+  .btn,
+  .chip,
+  select.inline {
+    min-height: 40px;
+  }
+  .btn.ghost {
+    min-height: 36px;
+  }
+  .photo .nav,
+  .lightbox .nav {
+    width: 42px;
+    height: 42px;
+    font-size: 22px;
+  }
+}
+@media (max-width: 640px) {
+  /* iOS zooms into any field under 16px on focus. */
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+  /* Overlays use the full width. */
+  .modal {
+    padding: max(12px, env(safe-area-inset-top, 0px)) 10px
+      max(12px, env(safe-area-inset-bottom, 0px));
+  }
+  .sheet {
+    padding: 16px;
+    border-radius: 10px;
+  }
+  .sheet-h h2 {
+    font-size: 24px;
+  }
+  /* Billing: the three totals stack in a tidy grid. */
+  .totals {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px 16px;
+  }
+  .totals .v {
+    font-size: 28px;
+  }
+  .bar {
+    grid-template-columns: 92px 1fr auto;
+  }
+  .entry {
+    grid-template-columns: 64px minmax(0, 1fr) auto;
+  }
+  /* Role badges stay on one line. */
+  .members li .cstat {
+    white-space: nowrap;
+    flex: none;
+  }
+}
+@media (max-width: 480px) {
+  /* Pros and cons stack instead of squeezing into two columns. */
+  .pc {
+    grid-template-columns: 1fr;
+  }
+  .card.detail .photo {
+    aspect-ratio: 4 / 3;
   }
 }

@@ -1,22 +1,39 @@
-import { districtNumber, LISTING_STATUS_LABELS, type CustomerListing } from "@jj/shared";
+import {
+  districtNumber,
+  LISTING_STATUS_LABELS,
+  type CustomerListing,
+  type Rating
+} from "@jj/shared";
 import { eur } from "../lib/format";
 import { Carousel, PhotoPlaceholder, type PhotoWithUrl } from "./Carousel";
+import { TileStars } from "./TileStars";
 
 /**
- * Board tile: photos, district plate, NEW tag and status, then price and
- * size. Everything else lives on the detail page, which the whole tile
- * links to (stretched link; the carousel arrows sit above it).
+ * Board tile: photos with a star-rating overlay, district plate, NEW tag
+ * and status, then price and size. Everything else lives on the detail
+ * page, which the whole tile links to (stretched link; the carousel arrows
+ * and the stars sit above it).
  */
 export function ListingCard({
   listing,
   photos,
   isNew,
-  onOpen
+  ratings,
+  searchId,
+  myName,
+  canRate,
+  onOpen,
+  onRatingsChanged
 }: {
   listing: CustomerListing;
   photos: PhotoWithUrl[];
   isNew: boolean;
+  ratings: Rating[];
+  searchId: string;
+  myName: string;
+  canRate: boolean;
   onOpen: () => void;
+  onRatingsChanged: () => void;
 }) {
   const l = listing;
   const gallery = photos.filter((p) => p.kind === "photo");
@@ -32,6 +49,14 @@ export function ListingCard({
       ) : (
         <PhotoPlaceholder listing={l} />
       )}
+      <TileStars
+        searchId={searchId}
+        listingId={l.id}
+        ratings={ratings}
+        myName={myName}
+        canRate={canRate}
+        onChanged={onRatingsChanged}
+      />
       <div className="card-top">
         <span
           className="plate dplate"

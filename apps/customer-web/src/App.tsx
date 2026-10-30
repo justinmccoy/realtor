@@ -13,7 +13,6 @@ import { SkeletonBoard } from "./components/Skeleton";
 import { HoursPanel } from "./components/HoursPanel";
 import { InvitePanel } from "./components/InvitePanel";
 import { ListingCard } from "./components/ListingCard";
-import { Summary } from "./components/Summary";
 import { configOk } from "./config";
 import { sortCards } from "./lib/fit";
 import { ListingDetail } from "./pages/ListingDetail";
@@ -173,7 +172,7 @@ export default function App() {
   if (!searches.length) {
     return (
       <div className="wrap">
-        <Header clientName={null} />
+        <Header />
         <div className="empty">
           <h3>No search assigned yet</h3>
           <p>
@@ -211,7 +210,6 @@ export default function App() {
   return (
     <div className="wrap">
       <Header
-        clientName={data.clientName}
         onOpenBrief={() => setBriefOpen(true)}
         onOpenInvite={() => setInviteOpen(true)}
         onOpenBilling={() => setBillingOpen(true)}
@@ -260,8 +258,6 @@ export default function App() {
           </nav>
 
           <section style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            <Summary listings={listings} />
-
             <div className="toolbar">
               <div className="chips">
                 {(["all", ...LISTING_STATUSES] as Filter[])
@@ -316,7 +312,12 @@ export default function App() {
                     listing={l}
                     photos={photosFor(l.id)}
                     isNew={newIds.has(l.id)}
+                    ratings={data.ratings}
+                    searchId={searchId}
+                    myName={auth.name}
+                    canRate={data.role === "client"}
                     onOpen={() => openListing(l.id)}
+                    onRatingsChanged={() => void refreshRatings()}
                   />
                 ))}
               </div>
@@ -449,12 +450,10 @@ export default function App() {
 }
 
 function Header({
-  clientName,
   onOpenBrief,
   onOpenInvite,
   onOpenBilling
 }: {
-  clientName: string | null;
   onOpenBrief?: () => void;
   onOpenInvite?: () => void;
   onOpenBilling?: () => void;
@@ -468,9 +467,7 @@ function Header({
   return (
     <header>
       <div>
-        <div className="eyebrow">
-          {clientName ? `Apartment search for ${clientName}` : "Apartment search"}
-        </div>
+        <div className="eyebrow">Discover your next home</div>
         <h1>
           Genau <span className="u">Here</span>
         </h1>
