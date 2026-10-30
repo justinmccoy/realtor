@@ -68,9 +68,13 @@ export function ListingCard({
             canRate={canRate}
             onChanged={onRatingsChanged}
           />
-          <span className="pill" data-st={l.status}>
-            {LISTING_STATUS_LABELS[l.status]}
-          </span>
+          {/* "New" is the default status; show the pill only once the listing
+              has moved along, so it isn't mistaken for the NEW tag. */}
+          {l.status !== "new" && (
+            <span className="pill" data-st={l.status}>
+              {LISTING_STATUS_LABELS[l.status]}
+            </span>
+          )}
         </span>
       </div>
       <a
