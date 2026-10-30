@@ -133,12 +133,17 @@ the proxy key is missing.
 Notes: ImmobilienScout24 and Kleinanzeigen usually refuse requests from cloud
 IP ranges; a scraping proxy or the paste fallback covers them. Up to 15 photos
 are pulled per import (6 per request, 8 MB each, JPEG/PNG/WebP); more can be
-uploaded by hand. API Gateway caps a request at 30 s, so an import is two
-requests: `import/fetch` gets the page (the proxy alone gets up to ~27 s for
-portals known to block cloud IPs, which skip the direct attempt), then
-`import` extracts fields, calls the AI model and creates the draft from that
-HTML. A slow or failed AI call degrades to "page markup only" rather than
-failing the import; a proxy timeout reports itself and can simply be retried.
+uploaded by hand. A link import runs as a background job: the API queues it
+(`POST /admin/import` → `202` + job id), a worker Lambda with a two-minute
+budget fetches the page and calls the AI, and the admin app polls
+`GET /admin/import/{jobId}` while the import modal shows the house being
+built. Page fetch, proxy fallback and AI call each have their own timeout
+(`IMPORT_BUDGETS` in `services/listings/src/import/index.ts`); portals known
+to wall off cloud IPs skip the direct attempt and go straight to the proxy,
+and a slow or failed AI call degrades to "page markup only" rather than
+failing the import. A job that overruns is marked failed with a `timeout`
+error and can simply be retried. Pasted text is read inline (≈25 s budget),
+since it only needs the AI call. Jobs expire from the table after a day.
 
 ## First-time deployment
 

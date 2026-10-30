@@ -56,34 +56,14 @@ export const extractedListingSchema = listingCreateSchema
   .partial();
 export type ExtractedListing = z.infer<typeof extractedListingSchema>;
 
-/** Portal pages run to 1–3 MB of HTML; the fetch step hands them back whole. */
+/** Portal pages run to 1–3 MB of HTML when pasted whole. */
 export const MAX_IMPORT_CONTENT_CHARS = 4_000_000;
 
 /**
- * Step 1 of an import: fetch the page (directly or through the proxy) and
- * return its HTML. Kept separate from extraction so a slow proxy render and
- * the AI call each get their own API Gateway window.
- */
-export const importFetchRequestSchema = z.object({
-  url: httpUrl,
-  sourceId: z.string().ulid().optional()
-});
-export type ImportFetchRequest = z.infer<typeof importFetchRequestSchema>;
-
-export const importFetchResultSchema = z.object({
-  html: z.string(),
-  finalUrl: httpUrl,
-  via: z.enum(["direct", "proxy"]),
-  truncated: z.boolean(),
-  portal: z.string().nullable()
-});
-export type ImportFetchResult = z.infer<typeof importFetchResultSchema>;
-
-/**
- * Step 2: extract + create the draft. `content` is the page HTML from step 1
- * or text the admin pasted; `url` alone (no content) still works and fetches
- * inline. `sourceId` links the result back to an inbox entry; `fetchedVia`
- * tells the result how step 1 got the page.
+ * Either a link to fetch (queued as a background job, see the job schemas
+ * below) or page content to read inline: text the admin pasted, or HTML a
+ * caller fetched itself, in which case `fetchedVia` says how. `sourceId`
+ * links the result back to an inbox entry.
  */
 export const importRequestSchema = z
   .object({
@@ -113,3 +93,51 @@ export const importResultSchema = z.object({
   aiUsed: z.boolean()
 });
 export type ImportResult = z.infer<typeof importResultSchema>;
+
+/* ---------- import jobs ---------- */
+
+/** A link import runs as a background job: POST starts it, GET polls it.
+ *  Pasted text is read inline (it only needs the AI call) and comes back as
+ *  a job that is already `done`. */
+export const IMPORT_JOB_STATUSES = ["queued", "running", "done", "failed"] as const;
+export type ImportJobStatus = (typeof IMPORT_JOB_STATUSES)[number];
+
+/** Coarse progress the worker reports while a job runs, in order. */
+export const IMPORT_STAGES = ["fetching", "extracting", "saving"] as const;
+export type ImportStage = (typeof IMPORT_STAGES)[number];
+
+export const importJobErrorSchema = z.object({
+  /** Same codes as the API error envelope, e.g. "upstream_blocked", "timeout". */
+  code: z.string(),
+  message: z.string()
+});
+export type ImportJobError = z.infer<typeof importJobErrorSchema>;
+
+export const importJobSchema = z.object({
+  id: z.string().ulid(),
+  status: z.enum(IMPORT_JOB_STATUSES),
+  stage: z.enum(IMPORT_STAGES).nullable(),
+  /** What was asked for. Pasted content is never echoed back by the API. */
+  request: z.object({
+    url: httpUrl.optional(),
+    sourceId: z.string().ulid().optional(),
+    content: z.string().optional()
+  }),
+  requestedBy: z.object({
+    userId: z.string(),
+    email: z.string(),
+    displayName: z.string()
+  }),
+  createdAt: z.string().datetime(),
+  startedAt: z.string().datetime().nullable(),
+  finishedAt: z.string().datetime().nullable(),
+  result: importResultSchema.nullable(),
+  error: importJobErrorSchema.nullable(),
+  /** DynamoDB TTL (epoch seconds); finished jobs are kept for a day. */
+  expiresAt: z.number().int()
+});
+export type ImportJob = z.infer<typeof importJobSchema>;
+
+/** How long the admin app keeps polling before it gives up on a job. The
+ *  worker Lambda has 120 s; the rest is queueing slack. */
+export const IMPORT_JOB_WAIT_MS = 150_000;

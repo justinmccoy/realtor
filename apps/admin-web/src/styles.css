@@ -311,3 +311,107 @@ table.tbl {
   gap: 8px;
   font-size: 14px;
 }
+
+/* house loader (listing import): a house gets built on a loop */
+.house-loader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 6px;
+  padding: 10px 0 6px;
+}
+.house {
+  width: 136px;
+  height: auto;
+  overflow: visible;
+}
+.house * {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.house .h-ground {
+  stroke: var(--line);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+.house .h-found {
+  fill: var(--muted);
+}
+.house .h-walls {
+  fill: var(--accent-soft);
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+.house .h-roof {
+  fill: var(--accent);
+}
+.house .h-door {
+  fill: var(--accent);
+}
+.house .h-window {
+  fill: var(--sign);
+}
+.house .h-smoke {
+  fill: var(--muted);
+  opacity: 0.55;
+}
+.house-label {
+  margin: 4px 0 0;
+  font-weight: 600;
+}
+.house-dots::after {
+  content: "…";
+}
+@media (prefers-reduced-motion: no-preference) {
+  .house .h-found {
+    animation: h-found 7s ease-in-out infinite;
+  }
+  .house .h-walls {
+    animation: h-walls 7s ease-in-out infinite;
+  }
+  .house .h-roof {
+    animation: h-roof 7s ease-in-out infinite;
+  }
+  .house .h-fit {
+    animation: h-fit 7s ease-in-out infinite;
+  }
+  .house .h-smoke {
+    animation: h-smoke 7s ease-in-out infinite;
+  }
+  .house-dots::after {
+    animation: h-dots 1.6s steps(1, end) infinite;
+  }
+}
+@keyframes h-found {
+  0% { opacity: 0; transform: translateY(6px); }
+  6%, 88% { opacity: 1; transform: none; }
+  94%, 100% { opacity: 0; transform: none; }
+}
+@keyframes h-walls {
+  0%, 12% { opacity: 0; transform: translateY(10px); }
+  20%, 88% { opacity: 1; transform: none; }
+  94%, 100% { opacity: 0; transform: none; }
+}
+@keyframes h-roof {
+  0%, 28% { opacity: 0; transform: translateY(-10px); }
+  36%, 88% { opacity: 1; transform: none; }
+  94%, 100% { opacity: 0; transform: none; }
+}
+@keyframes h-fit {
+  0%, 44% { opacity: 0; transform: scale(0.6); }
+  52%, 88% { opacity: 1; transform: none; }
+  94%, 100% { opacity: 0; transform: none; }
+}
+@keyframes h-smoke {
+  0%, 58% { opacity: 0; transform: translateY(6px); }
+  66% { opacity: 0.55; transform: translateY(0); }
+  86%, 100% { opacity: 0; transform: translateY(-8px); }
+}
+@keyframes h-dots {
+  0% { content: ""; }
+  25% { content: "."; }
+  50% { content: ".."; }
+  75%, 100% { content: "..."; }
+}

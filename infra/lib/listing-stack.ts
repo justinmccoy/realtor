@@ -31,7 +31,8 @@ export class ListingStack extends Stack {
     const table = new ServiceTable(this, "ListingTable", {
       config,
       tableName: "listing",
-      gsi1: true // sparse upcoming-viewings index
+      gsi1: true, // sparse upcoming-viewings index
+      timeToLiveAttribute: "expiresAt" // link-import jobs only
     }).table;
 
     const common = {
@@ -81,8 +82,10 @@ export class ListingStack extends Stack {
     });
 
     // Link import: fetch a portal page, extract fields (markup + AI), create a
-    // draft. Separate Lambda so it can use the whole API Gateway window
-    // (30 s) and more memory without touching the ordinary admin routes.
+    // draft. A link import takes longer than API Gateway's 30 s window once a
+    // proxy and the AI are involved, so it runs as a job: the API Lambda
+    // queues it (and reads pasted text inline), a worker Lambda with a
+    // two-minute budget picks it up from the bus, and the admin app polls.
     // The AI key lives in Secrets Manager; the stack creates the secret with
     // a random placeholder and the importer treats anything that is not a
     // real key as "AI off". Store the key with
@@ -107,18 +110,19 @@ export class ListingStack extends Stack {
       },
       removalPolicy: config.removalPolicy
     });
+    const importEnv = {
+      ...common,
+      AI_SECRET_ARN: aiSecret.secretArn,
+      PROXY_SECRET_ARN: proxySecret.secretArn,
+      IMPORT_AI_MODEL: config.listingImport.aiModel ?? "",
+      IMPORT_PROXY_URL_TEMPLATE: config.listingImport.proxyUrlTemplate ?? ""
+    };
     const importFn = new ServiceFunction(this, "ImportFn", {
       config,
       serviceName: "listing-import",
       entry: "services/listings/src/handlers/import.ts",
-      description: "Listing service: import a draft listing from a portal link",
-      environment: {
-        ...common,
-        AI_SECRET_ARN: aiSecret.secretArn,
-        PROXY_SECRET_ARN: proxySecret.secretArn,
-        IMPORT_AI_MODEL: config.listingImport.aiModel ?? "",
-        IMPORT_PROXY_URL_TEMPLATE: config.listingImport.proxyUrlTemplate ?? ""
-      },
+      description: "Listing service: queue a link import / read pasted text into a draft",
+      environment: importEnv,
       memorySize: 1024,
       timeout: Duration.seconds(29)
     }).fn;
@@ -126,8 +130,39 @@ export class ListingStack extends Stack {
     bus.grantPutEventsTo(importFn);
     aiSecret.grantRead(importFn);
     proxySecret.grantRead(importFn);
-    // One import legitimately takes 5–25 s, so the latency alarm is relaxed.
+    // A paste import legitimately takes 5–25 s, so the latency alarm is relaxed.
     addFunctionAlarms(this, "Import", importFn, props.alarmTopic, { slowP95Ms: 27_000 });
+
+    // The time budgets in services/listings/src/import/index.ts
+    // (IMPORT_BUDGETS.link) add up to well under this timeout; the worker
+    // records a "timeout" failure on the job itself before Lambda cuts it off.
+    const importWorkerFn = new ServiceFunction(this, "ImportWorkerFn", {
+      config,
+      serviceName: "listing-import-worker",
+      entry: "services/listings/src/handlers/import.ts",
+      handler: "worker",
+      description: "Listing service: run a queued link import (page fetch + AI)",
+      environment: importEnv,
+      memorySize: 1024,
+      timeout: Duration.seconds(120)
+    }).fn;
+    table.grantReadWriteData(importWorkerFn);
+    bus.grantPutEventsTo(importWorkerFn);
+    aiSecret.grantRead(importWorkerFn);
+    proxySecret.grantRead(importWorkerFn);
+    addFunctionAlarms(this, "ImportWorker", importWorkerFn, props.alarmTopic, {
+      slowP95Ms: 100_000
+    });
+    new events.Rule(this, "ImportRequested", {
+      eventBus: bus,
+      eventPattern: {
+        source: ["jj.listing"],
+        detailType: ["listing.import.requested"]
+      },
+      // The worker only throws on a malformed event; a failed import is
+      // recorded on the job, so retries cover delivery hiccups alone.
+      targets: [new targets.LambdaFunction(importWorkerFn, { retryAttempts: 1 })]
+    });
     new CfnOutput(this, "ImportAiSecretName", { value: aiSecret.secretName });
     new CfnOutput(this, "ImportProxySecretName", { value: proxySecret.secretName });
 
@@ -143,8 +178,8 @@ export class ListingStack extends Stack {
       authorizer: adminAuthorizer
     });
     httpApi.addRoutes({
-      path: "/api/v1/admin/import/fetch",
-      methods: [HttpMethod.POST],
+      path: "/api/v1/admin/import/{jobId}",
+      methods: [HttpMethod.GET],
       integration: importInt,
       authorizer: adminAuthorizer
     });

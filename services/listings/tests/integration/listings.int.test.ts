@@ -245,4 +245,39 @@ describe.skipIf(!run)("listing repo against DynamoDB (local emulator)", () => {
     await repo.deleteSource(src.id);
     expect((await repo.listSources()).some((s) => s.id === src.id)).toBe(false);
   });
+
+  it("import jobs: create, patch only the given fields, stay out of the pool", async () => {
+    const repo = await import("../../src/repo.js");
+    const job = await repo.createImportJob({
+      request: { url: "https://www.immobilienscout24.de/expose/job-1" },
+      requestedBy: { userId: "admin-1", email: "a@example.com", displayName: "Admin" }
+    });
+    expect(job.status).toBe("queued");
+    expect(job.expiresAt).toBeGreaterThan(Date.now() / 1000);
+    expect(await repo.getImportJob(job.id)).toEqual(job);
+
+    await repo.updateImportJob(job.id, { status: "running", stage: "fetching", startedAt: "2026-10-30T10:00:00.000Z" });
+    await repo.updateImportJob(job.id, { stage: "extracting" });
+    const mid = (await repo.getImportJob(job.id))!;
+    expect(mid.status).toBe("running");
+    expect(mid.stage).toBe("extracting");
+    expect(mid.startedAt).toBe("2026-10-30T10:00:00.000Z");
+    expect(mid.request.url).toBe(job.request.url);
+
+    await repo.updateImportJob(job.id, {
+      status: "failed",
+      error: { code: "upstream_blocked", message: "nope" },
+      finishedAt: "2026-10-30T10:00:30.000Z"
+    });
+    const done = (await repo.getImportJob(job.id))!;
+    expect(done.status).toBe("failed");
+    expect(done.error).toEqual({ code: "upstream_blocked", message: "nope" });
+    expect(done.stage).toBe("extracting");
+
+    expect(await repo.getImportJob("01ARZ3NDEKTSV4RRFFQ69G5FAV")).toBeNull();
+    await expect(
+      repo.updateImportJob("01ARZ3NDEKTSV4RRFFQ69G5FAV", { status: "done" })
+    ).rejects.toThrow();
+    expect((await repo.listAll()).some((l) => l.id === job.id)).toBe(false);
+  });
 });
