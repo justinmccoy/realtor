@@ -34,7 +34,8 @@ function emailTemplates(site: "client" | "admin", url?: string) {
         (site === "admin"
           ? `<p>Admin sign-in also requires an authenticator app; you will set it up on first login.</p>`
           : ""),
-      smsMessage: `${siteName}: your temporary password is {####}`
+      // Cognito rejects an invite SMS template without {username}.
+      smsMessage: `${siteName}: your username is {username} and your temporary password is {####}`
     },
     userVerification: {
       emailSubject: `${siteName}: your verification code`,
