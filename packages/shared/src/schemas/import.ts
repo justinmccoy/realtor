@@ -56,15 +56,41 @@ export const extractedListingSchema = listingCreateSchema
   .partial();
 export type ExtractedListing = z.infer<typeof extractedListingSchema>;
 
-export const MAX_IMPORT_CONTENT_CHARS = 2_000_000;
+/** Portal pages run to 1–3 MB of HTML; the fetch step hands them back whole. */
+export const MAX_IMPORT_CONTENT_CHARS = 4_000_000;
 
-/** Either a link to fetch, or pasted page content when the portal blocks
- *  automated requests. `sourceId` links the result back to an inbox entry. */
+/**
+ * Step 1 of an import: fetch the page (directly or through the proxy) and
+ * return its HTML. Kept separate from extraction so a slow proxy render and
+ * the AI call each get their own API Gateway window.
+ */
+export const importFetchRequestSchema = z.object({
+  url: httpUrl,
+  sourceId: z.string().ulid().optional()
+});
+export type ImportFetchRequest = z.infer<typeof importFetchRequestSchema>;
+
+export const importFetchResultSchema = z.object({
+  html: z.string(),
+  finalUrl: httpUrl,
+  via: z.enum(["direct", "proxy"]),
+  truncated: z.boolean(),
+  portal: z.string().nullable()
+});
+export type ImportFetchResult = z.infer<typeof importFetchResultSchema>;
+
+/**
+ * Step 2: extract + create the draft. `content` is the page HTML from step 1
+ * or text the admin pasted; `url` alone (no content) still works and fetches
+ * inline. `sourceId` links the result back to an inbox entry; `fetchedVia`
+ * tells the result how step 1 got the page.
+ */
 export const importRequestSchema = z
   .object({
     url: httpUrl.optional(),
     sourceId: z.string().ulid().optional(),
-    content: z.string().min(40).max(MAX_IMPORT_CONTENT_CHARS).optional()
+    content: z.string().min(40).max(MAX_IMPORT_CONTENT_CHARS).optional(),
+    fetchedVia: z.enum(["direct", "proxy"]).optional()
   })
   .refine((r) => r.url !== undefined || r.content !== undefined, {
     message: "Provide a url or pasted content"

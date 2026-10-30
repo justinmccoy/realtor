@@ -48,22 +48,47 @@ export function ImportRunner({
   const started = useRef(false);
 
   async function run(req: ImportRequest) {
-    setPhase({
-      kind: "fetching",
-      label: req.content
-        ? "Reading the pasted text…"
-        : "Fetching the page and extracting details…"
-    });
-    let result: ImportResult;
-    try {
-      result = await api.importListing(req);
-    } catch (e) {
+    const fail = (e: unknown, pasted: boolean) => {
       const blocked = e instanceof ApiClientError && e.code === "upstream_blocked";
       setPhase({
         kind: "error",
         message: e instanceof Error ? e.message : "Import failed",
-        canPaste: blocked || req.content === undefined
+        canPaste: blocked || !pasted
       });
+    };
+
+    // Step 1 (link only): fetch the page in its own request. A proxied,
+    // JS-rendered fetch can take 20 s, so it must not share the window with
+    // the AI call.
+    let extractReq: ImportRequest = req;
+    if (req.url && req.content === undefined) {
+      setPhase({ kind: "fetching", label: "Fetching the page…" });
+      try {
+        const page = await api.fetchImportPage(req.url, req.sourceId);
+        extractReq = {
+          url: page.finalUrl,
+          sourceId: req.sourceId,
+          content: page.html,
+          fetchedVia: page.via
+        };
+      } catch (e) {
+        fail(e, false);
+        return;
+      }
+    }
+
+    // Step 2: extract fields (markup + AI) and create the draft.
+    setPhase({
+      kind: "fetching",
+      label: extractReq.fetchedVia
+        ? "Page loaded. Extracting details…"
+        : "Reading the pasted text…"
+    });
+    let result: ImportResult;
+    try {
+      result = await api.importListing(extractReq);
+    } catch (e) {
+      fail(e, extractReq.fetchedVia === undefined);
       return;
     }
 

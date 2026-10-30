@@ -133,9 +133,12 @@ the proxy key is missing.
 Notes: ImmobilienScout24 and Kleinanzeigen usually refuse requests from cloud
 IP ranges; a scraping proxy or the paste fallback covers them. Up to 15 photos
 are pulled per import (6 per request, 8 MB each, JPEG/PNG/WebP); more can be
-uploaded by hand. One import has ~29 s end to end (API Gateway's limit), so
-page fetch, proxy fallback and AI call each run against their own timeout and
-degrade to "page markup only" rather than failing the import.
+uploaded by hand. API Gateway caps a request at 30 s, so an import is two
+requests: `import/fetch` gets the page (the proxy alone gets up to ~27 s for
+portals known to block cloud IPs, which skip the direct attempt), then
+`import` extracts fields, calls the AI model and creates the draft from that
+HTML. A slow or failed AI call degrades to "page markup only" rather than
+failing the import; a proxy timeout reports itself and can simply be retried.
 
 ## First-time deployment
 
