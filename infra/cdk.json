@@ -28,12 +28,17 @@
         "removalPolicy": "retain",
         "enableWaf": true,
         "alarmEmail": "",
-        "domain": null,
+        "domain": {
+          "zoneName": "genauhere.de",
+          "customer": "genauhere.de",
+          "customerAliases": ["www.genauhere.de"],
+          "admin": "admin.genauhere.de"
+        },
         "notify": {
           "mailFrom": "",
           "adminEmail": "",
-          "customerUrl": "https://d1czu5odsp4d48.cloudfront.net",
-          "adminUrl": "https://d1nxohwg5k95p0.cloudfront.net"
+          "customerUrl": "https://genauhere.de",
+          "adminUrl": "https://admin.genauhere.de"
         },
         "listingImport": {
           "proxyUrlTemplate": "",
