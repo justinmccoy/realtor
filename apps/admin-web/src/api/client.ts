@@ -6,8 +6,8 @@ import type {
   HoursCreateInput,
   HoursEntry,
   HoursUpdateInput,
+  ImportJob,
   ImportRequest,
-  ImportResult,
   InviteInput,
   Listing,
   ListingCreateInput,
@@ -198,9 +198,11 @@ export const api = {
   deleteInbox: (sourceId: string) =>
     call<void>(`/admin/inbox/${sourceId}`, { method: "DELETE" }),
 
-  /* link import → draft listing (+ photos downloaded by the media service) */
-  importListing: (body: ImportRequest) =>
-    call<ImportResult>("/admin/import", { method: "POST", body }),
+  /* link import → draft listing (+ photos downloaded by the media service).
+     A link import is queued and polled; pasted text comes back already done. */
+  startImport: (body: ImportRequest) =>
+    call<ImportJob>("/admin/import", { method: "POST", body }),
+  importJob: (jobId: string) => call<ImportJob>(`/admin/import/${jobId}`),
   importPhotos: (lid: string, kind: PhotoKind, urls: string[]) =>
     call<{ items: PhotoImportItem[] }>(`/admin/listings/${lid}/photos/import`, {
       method: "POST",

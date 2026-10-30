@@ -87,3 +87,51 @@ export const importResultSchema = z.object({
   aiUsed: z.boolean()
 });
 export type ImportResult = z.infer<typeof importResultSchema>;
+
+/* ---------- import jobs ---------- */
+
+/** A link import runs as a background job: POST starts it, GET polls it.
+ *  Pasted text is read inline (it only needs the AI call) and comes back as
+ *  a job that is already `done`. */
+export const IMPORT_JOB_STATUSES = ["queued", "running", "done", "failed"] as const;
+export type ImportJobStatus = (typeof IMPORT_JOB_STATUSES)[number];
+
+/** Coarse progress the worker reports while a job runs, in order. */
+export const IMPORT_STAGES = ["fetching", "extracting", "saving"] as const;
+export type ImportStage = (typeof IMPORT_STAGES)[number];
+
+export const importJobErrorSchema = z.object({
+  /** Same codes as the API error envelope, e.g. "upstream_blocked", "timeout". */
+  code: z.string(),
+  message: z.string()
+});
+export type ImportJobError = z.infer<typeof importJobErrorSchema>;
+
+export const importJobSchema = z.object({
+  id: z.string().ulid(),
+  status: z.enum(IMPORT_JOB_STATUSES),
+  stage: z.enum(IMPORT_STAGES).nullable(),
+  /** What was asked for. Pasted content is never echoed back by the API. */
+  request: z.object({
+    url: httpUrl.optional(),
+    sourceId: z.string().ulid().optional(),
+    content: z.string().optional()
+  }),
+  requestedBy: z.object({
+    userId: z.string(),
+    email: z.string(),
+    displayName: z.string()
+  }),
+  createdAt: z.string().datetime(),
+  startedAt: z.string().datetime().nullable(),
+  finishedAt: z.string().datetime().nullable(),
+  result: importResultSchema.nullable(),
+  error: importJobErrorSchema.nullable(),
+  /** DynamoDB TTL (epoch seconds); finished jobs are kept for a day. */
+  expiresAt: z.number().int()
+});
+export type ImportJob = z.infer<typeof importJobSchema>;
+
+/** How long the admin app keeps polling before it gives up on a job. The
+ *  worker Lambda has 120 s; the rest is queueing slack. */
+export const IMPORT_JOB_WAIT_MS = 150_000;

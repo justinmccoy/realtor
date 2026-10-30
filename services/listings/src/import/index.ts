@@ -5,7 +5,8 @@ import {
   type DistrictName,
   type ExtractableField,
   type ExtractedListing,
-  type ImportFetchMode
+  type ImportFetchMode,
+  type ImportStage
 } from "@jj/shared";
 import { extractWithAi, type AiExtractInput, type AiExtractResult } from "./ai.js";
 import { fetchListingPage, resolveFetchOptions, type FetchedPage } from "./fetchPage.js";
@@ -40,14 +41,30 @@ export interface ImportDeps {
   fetchPage: (url: string) => Promise<FetchedPage>;
   ai: (input: AiExtractInput) => Promise<AiExtractResult | null>;
   aiTimeoutMs: number;
+  /** Progress callback; the worker mirrors it onto the job for the admin app. */
+  onStage?: (stage: ImportStage) => void;
 }
 
-export function defaultDeps(): ImportDeps {
+/**
+ * Time budgets per import kind. A link import runs in the worker Lambda
+ * (120 s, see infra/lib/listing-stack.ts): the worst case — direct fetch
+ * refused, proxy slow, AI slow — must still finish inside it. Pasted text is
+ * read inline by the API Lambda (29 s, API Gateway's limit) and only needs
+ * the AI call.
+ */
+export const IMPORT_BUDGETS = {
+  link: { directTimeoutMs: 10_000, proxyTimeoutMs: 30_000, aiTimeoutMs: 60_000 },
+  paste: { aiTimeoutMs: 24_000 }
+} as const;
+
+export function defaultDeps(kind: keyof typeof IMPORT_BUDGETS = "link"): ImportDeps {
+  const fetchTimeouts = kind === "link" ? IMPORT_BUDGETS.link : {};
   return {
     // Resolved per call: the proxy key comes from Secrets Manager (cached).
-    fetchPage: async (url) => fetchListingPage(url, await resolveFetchOptions()),
+    fetchPage: async (url) =>
+      fetchListingPage(url, { ...(await resolveFetchOptions()), ...fetchTimeouts }),
     ai: extractWithAi,
-    aiTimeoutMs: 13_000
+    aiTimeoutMs: IMPORT_BUDGETS[kind].aiTimeoutMs
   };
 }
 
@@ -81,6 +98,7 @@ export async function runImport(input: ImportInput, deps: ImportDeps): Promise<I
       text = input.content.replace(/\r/g, "").replace(/[ \t]+/g, " ").trim();
     }
   } else if (input.url) {
+    deps.onStage?.("fetching");
     const page = await deps.fetchPage(input.url);
     fetchedVia = page.via;
     html = page.html;
@@ -97,6 +115,7 @@ export async function runImport(input: ImportInput, deps: ImportDeps): Promise<I
   const fields: ExtractedListing = { ...parsed.fields };
   const provenance: Provenance = { ...parsed.provenance };
 
+  deps.onStage?.("extracting");
   let aiUsed = false;
   if (text.length < 80) {
     warnings.push("Hardly any text was found on the page, so little could be extracted.");

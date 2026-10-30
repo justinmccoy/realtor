@@ -2,17 +2,20 @@ import {
   DeleteCommand,
   GetCommand,
   PutCommand,
-  QueryCommand
+  QueryCommand,
+  UpdateCommand
 } from "@aws-sdk/lib-dynamodb";
 import { ddb, newId, nowIso, tableName } from "@jj/lambda-kit";
 import {
   ApiError,
   briefSchema,
+  importJobSchema,
   listingSchema,
   settingsSchema,
   sourceSchema,
   visibility,
   type Brief,
+  type ImportJob,
   type Listing,
   type ListingCreateInput,
   type ListingUpdateInput,
@@ -313,5 +316,65 @@ export async function updateSource(
 export async function deleteSource(sourceId: string): Promise<void> {
   await ddb().send(
     new DeleteCommand({ TableName: T(), Key: listingKeys.source(sourceId) })
+  );
+}
+
+/* ---------- link import jobs ---------- */
+
+/** Finished and abandoned jobs alike disappear after a day. */
+const IMPORT_JOB_TTL_S = 24 * 3600;
+
+export type ImportJobPatch = Partial<
+  Pick<ImportJob, "status" | "stage" | "startedAt" | "finishedAt" | "result" | "error">
+>;
+
+export function itemToImportJob(item: Record<string, unknown>): ImportJob {
+  return importJobSchema.parse(item);
+}
+
+export async function createImportJob(input: {
+  request: ImportJob["request"];
+  requestedBy: ImportJob["requestedBy"];
+}): Promise<ImportJob> {
+  const job: ImportJob = {
+    id: newId(),
+    status: "queued",
+    stage: null,
+    request: input.request,
+    requestedBy: input.requestedBy,
+    createdAt: nowIso(),
+    startedAt: null,
+    finishedAt: null,
+    result: null,
+    error: null,
+    expiresAt: Math.floor(Date.now() / 1000) + IMPORT_JOB_TTL_S
+  };
+  await ddb().send(
+    new PutCommand({ TableName: T(), Item: { ...listingKeys.importJob(job.id), ...job } })
+  );
+  return job;
+}
+
+export async function getImportJob(jobId: string): Promise<ImportJob | null> {
+  const res = await ddb().send(
+    new GetCommand({ TableName: T(), Key: listingKeys.importJob(jobId) })
+  );
+  return res.Item ? itemToImportJob(res.Item) : null;
+}
+
+/** Sets only the given attributes, so a late progress write from the worker
+ *  can never undo a status the job already reached. */
+export async function updateImportJob(jobId: string, patch: ImportJobPatch): Promise<void> {
+  const entries = Object.entries(patch).filter(([, v]) => v !== undefined);
+  if (entries.length === 0) return;
+  await ddb().send(
+    new UpdateCommand({
+      TableName: T(),
+      Key: listingKeys.importJob(jobId),
+      UpdateExpression: "SET " + entries.map(([k]) => `#${k} = :${k}`).join(", "),
+      ExpressionAttributeNames: Object.fromEntries(entries.map(([k]) => [`#${k}`, k])),
+      ExpressionAttributeValues: Object.fromEntries(entries.map(([k, v]) => [`:${k}`, v])),
+      ConditionExpression: "attribute_exists(PK)"
+    })
   );
 }

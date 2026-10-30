@@ -243,6 +243,19 @@ function deps(overrides: Partial<ImportDeps> = {}): ImportDeps {
 }
 
 describe("runImport", () => {
+  it("reports fetching, then extracting, for a link", async () => {
+    const stages: string[] = [];
+    await runImport(
+      { url: "https://www.immobilienscout24.de/expose/123456" },
+      deps({ onStage: (s) => stages.push(s) })
+    );
+    expect(stages).toEqual(["fetching", "extracting"]);
+
+    stages.length = 0;
+    await runImport({ content: PASTED_TEXT }, deps({ onStage: (s) => stages.push(s) }));
+    expect(stages).toEqual(["extracting"]);
+  });
+
   it("builds a draft from a fetched page without AI", async () => {
     const out = await runImport({ url: "https://www.immobilienscout24.de/expose/123456" }, deps());
     expect(out.fetchedVia).toBe("direct");

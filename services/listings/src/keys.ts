@@ -3,6 +3,8 @@
  *  Global pool (listings have no owning search):
  *    POOL            / LISTING#<lid>      the listings themselves
  *    POOL            / SOURCE#<srcId>     the link inbox
+ *  Background link imports (TTL'd, never listed):
+ *    IMPORTJOB#<jobId> / JOB
  *  Per-search visibility + matching state:
  *    SEARCH#<sid>    / SHARE#<lid>        manual share/hide override
  *    SEARCH#<sid>    / CRITERIA           event-carried copy of brief+settings
@@ -11,6 +13,7 @@
 export const listingKeys = {
   listing: (listingId: string) => ({ PK: "POOL", SK: `LISTING#${listingId}` }),
   source: (sourceId: string) => ({ PK: "POOL", SK: `SOURCE#${sourceId}` }),
+  importJob: (jobId: string) => ({ PK: `IMPORTJOB#${jobId}`, SK: "JOB" }),
   share: (searchId: string, listingId: string) => ({
     PK: `SEARCH#${searchId}`,
     SK: `SHARE#${listingId}`

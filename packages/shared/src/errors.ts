@@ -8,6 +8,8 @@ export type ErrorCode =
   | "payload_too_large"
   /** A third-party site refused or failed the request (e.g. a bot wall). */
   | "upstream_blocked"
+  /** A background job ran out of its time budget. */
+  | "timeout"
   | "internal";
 
 /** Consistent error body returned by every endpoint. */
