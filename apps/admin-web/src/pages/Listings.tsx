@@ -679,6 +679,15 @@ function PhotoManager({
     await reload();
   }
 
+  /** The first photo is what clients see on the card and open the carousel
+   *  on, so "cover" is simply position 0. */
+  async function setCover(id: string) {
+    const rest = photos.filter((p) => p.kind === "photo" && p.id !== id).map((p) => p.id);
+    await api.reorderPhotos(listing.id, "photo", [id, ...rest]);
+    toast("Cover photo set");
+    await reload();
+  }
+
   const grid = (ofKind: PhotoKind) => {
     const items = photos.filter((p) => p.kind === ofKind);
     if (!items.length) return <p className="note-line">None yet.</p>;
@@ -687,6 +696,22 @@ function PhotoManager({
         {items.map((p, i) => (
           <figure key={p.id}>
             <img src={p.url} alt="" />
+            {ofKind === "photo" && i === 0 && (
+              <>
+                <span className="ph-cover">Cover</span>
+                <span className="ph-setcover muted">Current cover</span>
+              </>
+            )}
+            {ofKind === "photo" && i > 0 && (
+              <button
+                className="btn ghost ph-setcover"
+                type="button"
+                title="Show this photo first on the client site"
+                onClick={() => void setCover(p.id)}
+              >
+                Set as cover
+              </button>
+            )}
             <div className="ops">
               <button className="btn ghost" type="button" disabled={i === 0} onClick={() => void move(p.id, -1, ofKind)}>
                 ←
@@ -738,6 +763,10 @@ function PhotoManager({
         <span className="note-line">JPEG/PNG/WebP, max 8 MB each.</span>
       </div>
       <h4 style={{ margin: "8px 0 0" }}>Photos</h4>
+      <p className="note-line" style={{ margin: 0 }}>
+        The first photo is the cover clients see on the card. Use "Set as cover" or the arrows
+        to change the order.
+      </p>
       {grid("photo")}
       <h4 style={{ margin: "8px 0 0" }}>Floor plans</h4>
       {grid("floorplan")}
