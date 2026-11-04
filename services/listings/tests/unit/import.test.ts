@@ -90,6 +90,39 @@ describe("html helpers", () => {
     expect(urls.join(" ")).not.toMatch(/logo|sprite|star/);
   });
 
+  it("Engel & Völkers: takes the Uploadcare gallery at full size, not icons, stock or agents", () => {
+    const uc = (id: string, ops = "") => `https://uploadcare.engelvoelkers.com/${id}/${ops}`;
+    const hero = "8e60a632-4ca5-4cf4-80e9-514a220ddc44";
+    const g1 = "6abb3c22-c2bf-4f8a-82ef-ab431ef49428";
+    const g2 = "5f52614f-766b-46c1-b55d-2a8b00278083";
+    const icon = "20367ee3-b0ec-4b47-a7a4-a9f6fe0f23e9";
+    const crop = (w: number, h: number) =>
+      `-/format/webp/-/stretch/off/-/progressive/yes/-/scale_crop/${w}x${h}/center/-/quality/lighter/`;
+    const html = `<!doctype html><html><head>
+<link rel="apple-touch-icon" sizes="180x180" href="${uc(icon)}">
+<link rel="icon" type="image/png" sizes="32x32" href="${uc(icon)}">
+<meta property="og:image" content="${uc(hero)}">
+<script type="application/ld+json">{"@type":"RealEstateListing","image":"${uc(hero)}"}</script>
+</head><body>
+<img srcSet="${uc(hero, crop(640, 427))} 640w, ${uc(hero, crop(1440, 960))} 1440w" src="${uc(hero, crop(1080, 720))}">
+<img src="${uc(g1, crop(640, 427))}"><img src="${uc(g1, crop(1440, 960))}">
+<img src="${uc(g2, "-/format/webp/")}">
+<img src="https://a.storyblok.com/f/209096/5238x7507/bdf5f9f954/ev-r_advisor-office_hq_22656_ret_srgb_highres.jpg">
+<img src="https://a.storyblok.com/f/209096/1456x816/709b057b03/architectural-facade-ai.png">
+<img src="https://storage.googleapis.com/profile-engine-public-prod/agent_profile_images/7dd3266f_Martin-Bloch_1582x1582.jpg">
+<img src="https://cdn.example.com/listing/photo-7/120x80/preview.jpg">
+<img src="https://cdn.example.com/listing/photo-7/1600x1067/full.jpg">
+</body></html>`;
+    const urls = extractImageUrls(html, extractMeta(html), extractJsonLd(html));
+    const full = "-/preview/2000x2000/-/stretch/off/-/format/jpeg/-/quality/better/";
+    expect(urls).toEqual([
+      uc(hero, full),
+      uc(g1, full),
+      uc(g2, full),
+      "https://cdn.example.com/listing/photo-7/1600x1067/full.jpg"
+    ]);
+  });
+
   it("recognises html vs plain text", () => {
     expect(looksLikeHtml(PORTAL_HTML)).toBe(true);
     expect(looksLikeHtml(PASTED_TEXT)).toBe(false);

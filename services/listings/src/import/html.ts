@@ -144,10 +144,34 @@ export function htmlToText(html: string): string {
 const IMAGE_EXT = /\.(jpe?g|png|webp)(?=$|[/?#&])/i;
 const URL_RE = /https?:\/\/[^\s"'<>\\(){}\[\]]+/gi;
 const SKIP_IMAGE =
-  /logo|icon|sprite|pixel|avatar|favicon|badge|banner|placeholder|blank|spacer|tracking|\/ads?\/|emoji|flag|\/map|static\/|assets\/img|button|arrow|star|rating|agent|makler|anbieter|profil|portrait|\/16x|\/32x|\/48x|\/64x|1x1|_xs\.|_s\.|\bthumb\b|\/thumbs?\/|energieausweis|qr/i;
+  /logo|icon|sprite|pixel|avatar|favicon|badge|banner|placeholder|blank|spacer|tracking|\/ads?\/|emoji|flag|\/map|static\/|assets\/img|button|arrow|star|rating|agent|makler|anbieter|profil|portrait|\/16x|\/32x|\/48x|\/64x|1x1|_xs\.|_s\.|\bthumb\b|\/thumbs?\/|energieausweis|qr|storyblok|advisor|[-_]ai\.(?:jpe?g|png|webp)/i;
+
+/**
+ * Uploadcare-hosted photos (Engel & Völkers, among others) have no file
+ * extension: `https://<host>/<file-uuid>/` plus an optional chain of
+ * `-/op/…/` transformations such as crops and formats for each srcset slot.
+ */
+const UPLOADCARE_RE =
+  /^(https?:\/\/(?:[a-z0-9-]+\.)*(?:uploadcare\.[a-z0-9.-]+|ucarecdn\.com)\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/)/i;
+/** One large JPEG rendition per file: fits 2000 px, never upscales. */
+const UPLOADCARE_FULL = "-/preview/2000x2000/-/stretch/off/-/format/jpeg/-/quality/better/";
+
+/** Thumbnail renditions announce themselves with tiny WxH path segments. */
+const TINY_DIMENSIONS = /\/(\d{2,3})x(\d{2,3})(?=[/._-])/;
 
 function isCandidateImage(url: string): boolean {
-  return IMAGE_EXT.test(url) && !SKIP_IMAGE.test(url);
+  if (SKIP_IMAGE.test(url)) return false;
+  if (UPLOADCARE_RE.test(url)) return true;
+  if (!IMAGE_EXT.test(url)) return false;
+  const tiny = TINY_DIMENSIONS.exec(url);
+  return !(tiny && Math.max(Number(tiny[1]), Number(tiny[2])) < 320);
+}
+
+/** The URL to actually download: for Uploadcare, the full-size rendition
+ *  regardless of which crop or format the page happened to reference. */
+export function normalizeImageUrl(url: string): string {
+  const uc = UPLOADCARE_RE.exec(url);
+  return uc ? `${uc[1]}${UPLOADCARE_FULL}` : url;
 }
 
 function dedupeKey(url: string): string {
@@ -181,8 +205,9 @@ export function extractImageUrls(
   const push = (raw: string) => {
     const url = raw.trim().replace(/[.,;:)]+$/, "");
     if (!/^https?:\/\//i.test(url) || !isCandidateImage(url)) return;
-    const key = dedupeKey(url);
-    if (!seen.has(key)) seen.set(key, url);
+    const full = normalizeImageUrl(url);
+    const key = dedupeKey(full);
+    if (!seen.has(key)) seen.set(key, full);
   };
 
   for (const k of ["og:image", "og:image:secure_url", "twitter:image"]) {
@@ -195,7 +220,10 @@ export function extractImageUrls(
     stringsIn(obj["photos"], found);
     found.forEach(push);
   }
+  // <link> tags carry favicons and touch icons, which on some portals live on
+  // the same image CDN as the photos and would otherwise pass as candidates.
   const unescaped = html
+    .replace(/<link\b[^>]*>/gi, " ")
     .replace(/\\\//g, "/")
     .replace(/\\u0026/g, "&")
     .replace(/&amp;/g, "&");
