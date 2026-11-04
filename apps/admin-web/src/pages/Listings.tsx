@@ -15,6 +15,8 @@ import {
   type VisibilityReason
 } from "@jj/shared";
 import { api, type PhotoWithUrl } from "../api/client";
+import { CUSTOMER_SITE } from "../config";
+import { listingPreviewUrl } from "../lib/customerSite";
 import { eur, fmtWhen } from "../lib/format";
 import { DangerButton, Modal, useToast } from "../components/ui";
 import { ListingEditor, type EditorTarget } from "./ListingEditor";
@@ -244,7 +246,20 @@ export function Listings({
                     />
                   </td>
                   <td>
-                    <b>{l.title}</b>
+                    {CUSTOMER_SITE && l.published ? (
+                      <a
+                        href={listingPreviewUrl(CUSTOMER_SITE, l.id)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title="Open on the client site (new tab)"
+                      >
+                        <b>{l.title}</b>
+                      </a>
+                    ) : (
+                      <b title={l.published ? undefined : "Publish to preview on the client site"}>
+                        {l.title}
+                      </b>
+                    )}
                     {l.benchmark && <span className="benchtag"> benchmark</span>}
                     {l.topRank > 0 && <span className="rankbadge"> #{l.topRank}</span>}
                     <br />
