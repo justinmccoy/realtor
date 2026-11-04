@@ -25,6 +25,8 @@ CUSTOMER_URL="$(get_output Frontend customerUrl)"
 ADMIN_BUCKET="$(get_output Frontend adminBucketName)"
 ADMIN_DIST="$(get_output Frontend adminDistributionId)"
 ADMIN_URL="$(get_output Frontend adminUrl)"
+# The admin app links each listing to its page on the client site.
+export VITE_CUSTOMER_URL="$CUSTOMER_URL"
 
 echo "Building customer-web…"
 pnpm --filter @jj/customer-web build

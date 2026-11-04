@@ -138,6 +138,7 @@ cat > apps/admin-web/.env.local <<EOF
 VITE_API_BASE=https://<dev-admin-cloudfront-domain>
 VITE_ADMIN_POOL_ID=eu-central-1_yyy
 VITE_ADMIN_CLIENT_ID=yyyy
+VITE_CUSTOMER_URL=https://<dev-customer-cloudfront-domain>   # listing → client-site preview links
 EOF
 pnpm --filter @jj/admin-web dev       # http://localhost:5174
 ```
